@@ -1,13 +1,13 @@
 # Software Requirements Specification
 
-## MZPrintFlow — Print Operations Management System
+## LLL Print — Print Operations Management System
 
 | Document field | Value |
 |---|---|
 | Document type | Software Requirements Specification (SRS) |
 | Version | 1.0 Draft |
 | Date | 27 August 2026 |
-| Product | MZPrintFlow |
+| Product | LLL Print |
 | Intended market | Malaysian apparel printing businesses |
 | Status | Ready for stakeholder review |
 
@@ -31,11 +31,11 @@
 
 ### 1.1 Purpose
 
-This Software Requirements Specification defines the functional and non-functional requirements for MZPrintFlow, a multi-company print-shop operations system. It provides a formal agreement between stakeholders, designers, developers, testers, and supervisors concerning what the system shall do and how its quality will be evaluated.
+This Software Requirements Specification defines the functional and non-functional requirements for LLL Print, a multi-company print-shop operations system. It provides a formal agreement between stakeholders, designers, developers, testers, and supervisors concerning what the system shall do and how its quality will be evaluated.
 
 ### 1.2 Scope
 
-MZPrintFlow shall support the operational lifecycle of apparel-printing orders, including customer enquiries, quotations, artwork proofs, print jobs, production stages, stock consumption, invoices, payments, reporting, staff access, and customer communication.
+LLL Print shall support the operational lifecycle of apparel-printing orders, including customer enquiries, quotations, artwork proofs, print jobs, production stages, stock consumption, invoices, payments, reporting, staff access, and customer communication.
 
 The initial target processes include:
 
@@ -45,7 +45,7 @@ The initial target processes include:
 - Embroidery
 - Custom production workflows
 
-MZPrintFlow will be implemented with original source code, branding, content, and design assets. The product blueprint was informed by black-box study of an external reference platform; no third-party private code or backend implementation forms part of this specification.
+LLL Print will be implemented with original source code, branding, content, and design assets. The product blueprint was informed by black-box study of an external reference platform; no third-party private code or backend implementation forms part of this specification.
 
 ### 1.3 Intended Audience
 
@@ -69,7 +69,7 @@ MZPrintFlow will be implemented with original source code, branding, content, an
 
 ### 1.5 References
 
-- `MZPRINTFLOW_SYSTEM_BLUEPRINT.md`
+- `LLL_PRINT_SYSTEM_BLUEPRINT.md`
 - `REFERENCE_TECHNICAL_OBSERVATIONS.md`
 - Malaysia Personal Data Protection Act 2010 (PDPA)
 - Current LHDN/MyInvois documentation, subject to a separate compliance review before implementation
@@ -80,7 +80,7 @@ MZPrintFlow will be implemented with original source code, branding, content, an
 
 ### 2.1 Product Perspective
 
-MZPrintFlow is a responsive, multi-tenant web application and progressive web application. Each subscribing business operates in an isolated company workspace. Owners configure the business, invite staff, manage production, and access reports. Customers use restricted public links for quotation requests, order tracking, proof approval, and invoice-balance viewing.
+LLL Print is a responsive, multi-tenant web application and progressive web application. Each subscribing business operates in an isolated company workspace. Owners configure the business, invite staff, manage production, and access reports. Customers use restricted public links for quotation requests, order tracking, proof approval, and invoice-balance viewing.
 
 The system consists of the following logical domains:
 
@@ -115,7 +115,7 @@ The system consists of the following logical domains:
 | Customer | Recipient of a restricted public link | Submit quote request, track own order, review proof, view own balance |
 | Staff member | Employee of a subscribed print business | Access permitted operational modules and actions |
 | Owner | Primary administrator of a company workspace | Full company operations, configuration, staff, subscription, and data controls |
-| Platform administrator | Operator of the MZPrintFlow service | Manage companies, plans, billing support, platform notifications, and audits |
+| Platform administrator | Operator of the LLL Print service | Manage companies, plans, billing support, platform notifications, and audits |
 | External service | Approved integration endpoint | Deliver email, WhatsApp, push, OCR, AI, payment, or e-invoice services |
 
 ### 2.4 Operating Environment
@@ -163,7 +163,7 @@ Public visitor/customer
         │ quote request, tracking, proof decision
         ▼
 ┌─────────────────────────────────────────┐
-│               MZPrintFlow               │
+│               LLL Print               │
 │ CRM ─ Sales ─ Production ─ Stock        │
 │ Tasks ─ Finance ─ Insights ─ Settings   │
 └─────────────────────────────────────────┘

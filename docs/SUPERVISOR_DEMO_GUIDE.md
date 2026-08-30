@@ -1,15 +1,15 @@
-# MZPrintFlow Clickable MVP — Supervisor Demo Guide
+# LLL Print Clickable MVP — Supervisor Demo Guide
 
 ## Purpose
 
-This prototype demonstrates the proposed MZPrintFlow information architecture, interface direction, and core user journey before backend development begins.
+This prototype demonstrates the proposed LLL Print information architecture, interface direction, and core user journey before backend development begins.
 
 It is a frontend mock application. Records created during the demonstration are stored temporarily in browser memory and reset when the page is refreshed.
 
 ## Start the Prototype
 
 ```powershell
-cd C:\dev\MZPrintFlow
+cd C:\dev\lll-print
 npm run dev
 ```
 
@@ -19,7 +19,7 @@ Open the local address printed by Vite, normally `http://localhost:5173`.
 
 The login form is prefilled for demonstration:
 
-- Email: `owner@mzprintflow.demo`
+- Email: `owner@lll-print.demo`
 - Password: `prototype`
 
 The login is simulated and does not connect to a real authentication service.
@@ -28,7 +28,7 @@ The login is simulated and does not connect to a real authentication service.
 
 ### 1. Login and product positioning
 
-- Show the original MZPrintFlow identity.
+- Show the independent LLL Print identity.
 - Explain that the product is designed for Malaysian printing operations.
 - Point out MYR currency and Malaysian date formatting.
 - Enter the demo workspace.

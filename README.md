@@ -1,4 +1,4 @@
-# MZPrintFlow
+# LLL Print
 
 An original print-shop operations application scaffold derived from black-box product requirements—not from third-party source code or proprietary assets.
 
@@ -35,13 +35,21 @@ npm run build
 
 ```text
 src/
-  data/mockData.ts       Development fixtures
-  domain/models.ts       Core TypeScript entities
-  App.tsx                Responsive application and module views
-  App.css                Original design system and responsive styles
+  app/                    Router, route table, query provider
+  components/layout/      Shared app shell/layout components
+  data/mockData.ts        Development fixtures
+  domain/models.ts        Core TypeScript entities
+  lib/formatters.ts       Malaysian date/currency formatting helpers
+  test/setup.ts           Test environment setup
+  App.tsx                 Application entry (router + query provider)
+  PrototypeApp.tsx        Responsive application and module views
+  App.css                 Original design system and responsive styles
 docs/
-  MZPRINTFLOW_SYSTEM_BLUEPRINT.md
-  MZPRINTFLOW_SRS.md
+  PRODUCT_VISION.md
+  MVP_SCOPE.md
+  SPMP.md
+  LLL_PRINT_SYSTEM_BLUEPRINT.md
+  LLL_PRINT_SRS.md
   REFERENCE_TECHNICAL_OBSERVATIONS.md
   SUPERVISOR_DEMO_GUIDE.md
 ```
