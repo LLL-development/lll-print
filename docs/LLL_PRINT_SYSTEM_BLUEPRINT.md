@@ -1,15 +1,15 @@
-# MZPrintFlow Product Analysis and Reconstruction Blueprint
+# LLL Print Product Analysis and Reconstruction Blueprint
 
 **Prepared:** 27 August 2026  
 **Reference product reviewed:** <https://www.nzprintflow.my/#/dashboard>  
 **Assessment type:** External black-box product inspection  
 **Purpose:** Document the observable product so a comparable print-shop management system can be planned and built.
 
-> This report supports the original MZPrintFlow implementation using observable product concepts from the referenced platform. It does not contain or claim access to third-party source code, private APIs, database internals, proprietary algorithms, branding, copy, or visual assets.
+> This report supports the original LLL Print implementation using observable product concepts from the referenced platform. It does not contain or claim access to third-party source code, private APIs, database internals, proprietary algorithms, branding, copy, or visual assets.
 
 ## 1. Executive Summary
 
-MZPrintFlow is planned as a responsive, multi-company print-production management platform for Malaysian apparel printing businesses. Its blueprint combines customer and supplier management, print jobs, production workflows, quotations and invoices, inventory and stock movements, finance, reminders, analytics, staff access, QR-assisted factory operations, WhatsApp communication, and AI-assisted planning in one application.
+LLL Print is planned as a responsive, multi-company print-production management platform for Malaysian apparel printing businesses. Its blueprint combines customer and supplier management, print jobs, production workflows, quotations and invoices, inventory and stock movements, finance, reminders, analytics, staff access, QR-assisted factory operations, WhatsApp communication, and AI-assisted planning in one application.
 
 The observed product has two main experiences:
 
