@@ -1,66 +1,97 @@
 # LLL Print
 
-An original print-shop operations application scaffold derived from black-box product requirements—not from third-party source code or proprietary assets.
+LLL Print is a frontend foundation for a Malaysian print-shop operations
+workspace. It brings quotations, production jobs, contacts, inventory, stock,
+and finance views into one responsive interface for office and factory-floor
+use.
 
-## Current scaffold
+The application currently uses local mock data. It has no production backend,
+login, database, or external integration.
 
-- Responsive desktop sidebar and six-item mobile navigation
-- Dashboard with production metrics and action centre
-- Searchable/filterable print-job table
-- Documents workspace
-- Customer and supplier contacts
-- Inventory Items & BOM workspace
-- Auditable stock-movement ledger
-- Operational finance overview in MYR
-- Production insights
-- Typed domain models and realistic mock data
-- Malaysian date and currency formatting
+## Technology stack
 
-This is a frontend-only clickable MVP. Login, navigation, job search and filtering, record-creation dialogs, job detail/progress, and settings feedback are interactive. New demo records are stored in browser memory and reset after the page is refreshed.
+| Area | Technology |
+|---|---|
+| Framework | React 19 |
+| Language | TypeScript |
+| Build tool | Vite |
+| Routing | React Router |
+| Client data foundation | TanStack Query |
+| Tests | Vitest and Testing Library |
+| Linting | Oxlint |
 
-## Run locally
+## Prerequisites
+
+- A current Node.js LTS release
+- npm
+
+## Local development
 
 ```powershell
-npm install
+# Install the locked project dependencies
+npm ci
+
+# Start the development server
 npm run dev
-```
 
-Production verification:
-
-```powershell
+# Create a production build
 npm run build
+
+# Run automated tests
+npm run test
+
+# Run linting
+npm run lint
+
+# Preview a production build locally
+npm run preview
 ```
 
-## Structure
+## Current capabilities
+
+- Responsive desktop sidebar and mobile navigation
+- Dashboard with production metrics and action centre
+- Searchable and filterable print-job table
+- Quotation and invoice workspace
+- Customer and supplier contacts
+- Inventory, BOM, and stock-ledger views
+- Finance and production-insight views in MYR
+- Malaysian date and currency formatting
+- Typed domain models and development fixtures
+
+## Project structure
 
 ```text
 src/
-  app/                    Router, route table, query provider
-  components/layout/      Shared app shell/layout components
-  data/mockData.ts        Development fixtures
-  domain/models.ts        Core TypeScript entities
-  lib/formatters.ts       Malaysian date/currency formatting helpers
-  test/setup.ts           Test environment setup
-  App.tsx                 Application entry (router + query provider)
-  PrototypeApp.tsx        Responsive application and module views
-  App.css                 Original design system and responsive styles
+  app/                    Application router, route table, query provider
+  components/layout/      Shared application shell and layout
+  data/                   Development fixtures
+  domain/                 Core TypeScript models
+  lib/                    Shared formatters and unit tests
+  test/                   Test environment setup
+  App.tsx                 Application composition root
+  PrototypeApp.tsx        Interactive frontend views
+  App.css                 Application design system and responsive styles
+  index.css               Global styles
 docs/
-  PRODUCT_VISION.md
-  MVP_SCOPE.md
-  SPMP.md
-  LLL_PRINT_SYSTEM_BLUEPRINT.md
-  LLL_PRINT_SRS.md
-  REFERENCE_TECHNICAL_OBSERVATIONS.md
-  SUPERVISOR_DEMO_GUIDE.md
+  SPMP.md                 Project plan and current phase scope
+  SRS.md                  Product context, v1 scope, and requirements
+  SDD.md                  Design intent derived from the SRS
 ```
 
-## Recommended next implementation stage
+## Documentation and scope
 
-1. Add URL routing and production authentication.
-2. Add company tenancy and owner/staff roles.
-3. Replace in-memory demo data with a transactional API and database.
-4. Add production-grade validation and file handling.
-5. Implement persistent workflow-stage events and stock movements.
-6. Add tests before introducing OCR, AI, WhatsApp, or accounting features.
+The current documents are Draft:
 
-See the product blueprint in `docs/` for the complete domain, workflow, security, and phased-delivery specification.
+- [`docs/SPMP.md`](docs/SPMP.md) — project plan and phase scope
+- [`docs/SRS.md`](docs/SRS.md) — product context, requirements, and
+  acceptance checks
+- [`docs/SDD.md`](docs/SDD.md) — architecture and data-design intent
+
+Backend services, authentication, a database, AI, messaging, payment
+integration, and permission enforcement are deferred to separately authorized
+future phases.
+
+## License
+
+Private. All rights reserved.
