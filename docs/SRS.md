@@ -3,7 +3,7 @@
 Project: LLL Print
 Status: Draft — the current phase includes completing and reviewing the SRS
 development baseline; it remains Draft until accepted.
-Last updated: 2026-09-08
+Last updated: 2026-09-09
 
 This document specifies what LLL Print must do: product context, v1
 scope, and the functional/non-functional requirements derived from that
@@ -31,7 +31,104 @@ reviewing design intent or implementation against the agreed v1 scope.
 - `docs/SPMP.md` covers project management and phase authorization;
   `docs/SDD.md` covers design intent derived from this SRS.
 
-### Intended users
+### A typical order, in plain language
+
+An Admin receives an enquiry for printed items outside the application.
+They select the customer, enter the requested items, quantities, prices and
+due date, and record where the enquiry came from. This creates a **quotation**:
+an offer, not yet a production instruction or a payment record.
+
+When the customer accepts, the Admin confirms conversion to a **job**. The
+job preserves what was agreed so later edits cannot silently change the
+production record. Production work progresses through the defined stages;
+Admin and Staff can understand its current status from the job view. Their
+responsibilities do not imply that prototype role labels enforce permissions.
+
+After conversion creates a job, the Admin may deliberately create an
+**invoice** before, during or after production, which records the full amount
+due. A confirmed partial payment before production is a **deposit**: money
+actually received, not merely requested. Each confirmed
+**payment** reduces the outstanding balance. Finishing production, issuing
+an invoice and receiving money are separate events.
+
+```mermaid
+flowchart LR
+    E[Enquiry outside the app] --> Q[Draft quotation]
+    Q --> S[Sent quotation]
+    S --> A[Accepted]
+    S --> D[Declined: no job]
+    A --> C[Confirm conversion]
+    C --> J[Job and agreed snapshot]
+    J --> R[Ready for delivery]
+    R --> V[Delivered]
+    J --> I[Manually issue invoice at any non-cancelled job stage]
+    I --> P[Record confirmed payments]
+```
+
+This is the normal journey; FR-2, FR-3 and FR-8 define revisions,
+cancellation, rework and payment voiding. The diagram does not add messaging,
+automatic acceptance, or automatic invoice creation.
+
+| Term | Meaning in LLL Print |
+|---|---|
+| Contact | A customer or supplier record used by operational documents |
+| Quotation | The proposed items, quantities and price offered to a customer |
+| Job | The production work created from an accepted quotation |
+| Invoice | The issued record of the amount the customer owes |
+| Payment | One confirmed receipt of money against an invoice |
+| Refund | One confirmed return of previously received money, completed outside the application |
+| Job billing record | The linked invoice versions, receipts and refunds for one job/customer; not a bank account or full accounting ledger |
+| Inventory item | A material whose stock is tracked in a defined unit |
+| BOM | A recipe describing material quantities per finished unit; it does not consume stock in v1 |
+| Stock Ledger | The history explaining each manual change in material balance |
+
+Inventory supports the order journey but is a separate workflow. Job
+completion does not deduct stock in v1; an explicit manual stock movement
+does. The system is not a full accounting package.
+
+### Worked example: 100 printed shirts
+
+This synthetic example explains the agreed flow; it is not product pricing
+or real customer data. Size variants use separate lines under the existing
+scope. Tax is zero for this example, not a tax-policy decision.
+
+| Step | Action | Expected record/result |
+|---|---|---|
+| 1. Enquiry | Admin selects a customer and records the requested delivery date and enquiry source | One draft quotation |
+| 2. Price | Enter 50 medium shirts and 50 large shirts, each at RM18.00 | Two lines of RM900.00; subtotal RM1,800.00 |
+| 3. Review | Apply RM100.00 quotation discount and 0% tax | Grand total RM1,700.00; quantities remain 50 + 50 |
+| 4. Agreement | Record sent, then accepted after the external customer response | Accepted quotation; no payment or job is implied by acceptance |
+| 5. Production handoff | Confirm conversion | One linked job preserves both lines, quantities and RM1,700.00 agreed total |
+| 6. Invoice | Admin deliberately issues an invoice from the pending job | One invoice for the full RM1,700.00, initially unpaid |
+| 7. Deposit receipt | Confirm a RM700.00 bank-transfer payment actually received before production | Partially paid; balance RM1,000.00 |
+| 8. Production | Progress the job through permitted stages and into ready for delivery | Visible production status and relevant activity entries; no second invoice or automatic stock movement |
+| 9. Final receipt | Confirm RM1,000.00 against the same invoice | Paid; balance RM0.00; do not invoice the deposit again |
+| 10. Delivery | Mark the ready job delivered when handover occurs | Delivered job; delivery does not change invoice or payment totals |
+
+Payment and delivery timing are separate. This is one possible sequence,
+not a requirement to pay a deposit before starting production or to pay in
+full before delivery. The billing direction was expanded on 2026-09-09 to
+support receipts before production. A configurable deposit request, percentage
+schedule and automatic production/payment gate are not included.
+
+Separately, an inventory item could have 150 blank shirts after a manual
+stock-in. A manual stock-out of 100 leaves 50. A BOM recording one blank shirt
+per finished shirt describes the recipe but does not post that stock-out.
+Stock must not change a second time when the job is marked ready or delivered.
+
+If the RM700.00 payment was entered incorrectly, voiding it with a reason
+retains its history. With only the RM1,000.00 payment remaining, the balance
+becomes RM700.00. No historical payment is overwritten.
+
+### Release meaning
+
+The current task is documentation. **v1** below describes a frontend
+demonstration with synthetic data and display-only Admin/Staff labels.
+**Real-data release** means a later persistent operational system. The
+proposed security targets in §5 must be resolved and verified before that
+release; prototype role display must never be presented as authentication.
+
+### Intended users and responsibilities
 
 Target device contexts: office desktop, supervisor tablet, factory-floor
 mobile device. Applicable features must define behavior for all three.
@@ -94,7 +191,7 @@ authorize backend, database, infrastructure, dependency, or deployment work
    hidden "confirm" step, so the displayed total always reflects the entered
    line items.
 2. **Explicit quotation status lifecycle** — draft → sent →
-   accepted/declined → converted-to-job. Not a single paid/unpaid flag.
+   accepted or declined; only accepted → converted-to-job. Not a single paid/unpaid flag.
 3. **Job tracking board** — all jobs, current production stage, due date,
    status.
 4. **Source-of-enquiry note** — a free-text field on each quotation
@@ -106,9 +203,12 @@ authorize backend, database, infrastructure, dependency, or deployment work
 6. **Visible delivery status** — a real, visible status on the job board,
    not hidden metadata.
 7. **Manual invoice creation** — a separate, deliberate step from "job
-   production complete," not automatically coupled.
+   production complete," not automatically coupled. Issued corrections use
+   linked replacements; cancellations use explicitly agreed settlement.
 8. **Payment marking with confirmation** — recording a payment requires
-   confirming amount/date, not a single unconfirmed click.
+   confirming amount/date, not a single unconfirmed click. Includes a deposit
+   received before production against an already-issued invoice.
+   Includes manual refund records and a separate cancellation settlement.
 9. **Contacts (customers/suppliers), Inventory & BOM, Stock Ledger** — the
    current prototype screens, refined per the confirmed roles.
 10. **Basic roles reflected in the UI** — Admin, Staff, at least visually
@@ -162,8 +262,8 @@ flowchart LR
         UC4(("Record source of enquiry<br/>FR-4"))
         UC5(("View activity/audit log<br/>FR-5"))
         UC6(("View delivery status<br/>FR-6"))
-        UC7(("Create invoice<br/>FR-7"))
-        UC8(("Record payment<br/>FR-8"))
+        UC7(("Issue/correct invoice<br/>FR-7"))
+        UC8(("Record payments/refunds<br/>FR-8"))
         UC9(("Manage contacts / inventory &amp; BOM / stock ledger<br/>FR-9"))
         UC10(("See role indicator<br/>FR-10"))
         UC11(("Use mobile navigation<br/>FR-11"))
@@ -206,8 +306,8 @@ is deferred (§3).
 | Record source of enquiry | Admin | FR-4 |
 | View activity/audit log | Admin, Staff when permitted | FR-5 |
 | View delivery status | Admin, Staff when permitted | FR-6 |
-| Create invoice | Admin | FR-7 |
-| Record payment | Admin | FR-8 |
+| Issue/correct invoice and settle cancellation | Admin | FR-7 |
+| Record payments/refunds | Admin | FR-8 |
 | Manage contacts / inventory & BOM / stock ledger | Admin | FR-9 |
 | See role indicator | Admin, Staff | FR-10 |
 | Use mobile navigation | Admin, Staff when permitted | FR-11 |
@@ -232,8 +332,9 @@ its own configured module actions (FR-10.1, § 6 open item).
   calculations shall retain decimal precision and display MYR values rounded
   to two decimal places.
 - FR-1.6 The system shall prevent a quotation from being sent unless it has a
-  customer and at least one complete line item with a description, quantity,
-  unit price, a due date, and a source-of-enquiry note.
+  customer, document-level due date and source-of-enquiry note, and at least
+  one complete line item with description, positive quantity, unit and unit price.
+  All saved lines shall be complete before sending.
 - FR-1.7 If a quotation create or update action fails validation, the system
   shall retain the entered values and show a clear, recoverable error.
 - FR-1.8 The system shall provide an optional generic Tax field on each
@@ -260,6 +361,9 @@ its own configured module actions (FR-10.1, § 6 open item).
   quantity.
 - FR-1.13 The system shall copy each quotation-line quantity and unit into the
   job snapshot when the quotation is converted to a job.
+- FR-1.14 The system shall allow incomplete drafts while clearly marking their
+  totals provisional. Complete valid rows contribute immediately; invalid
+  negative/out-of-range values shall not be silently accepted as zero.
 
 ### FR-2 Quotation status lifecycle (§2 item 2)
 
@@ -273,13 +377,22 @@ its own configured module actions (FR-10.1, § 6 open item).
 - FR-2.4 The system shall show a confirmation that summarizes the quotation
   before converting it to a job.
 - FR-2.5 The system shall allow a draft quotation to be edited.
-- FR-2.6 The system shall not allow a sent or accepted quotation to be edited
-  directly. A change to either status shall create a new draft revision linked
+- FR-2.6 The system shall not allow a sent, accepted or declined quotation to be edited
+  directly. A change to these states shall create a new draft revision linked
   to the earlier quotation.
 - FR-2.7 The system shall retain earlier quotation revisions in the quotation
   history.
-- FR-2.8 The system shall allow conversion to a job only from the latest
-  accepted revision of a quotation.
+- FR-2.8 The system shall allow conversion only when the latest revision in
+  the quotation family is accepted. A newer draft, sent or declined revision
+  shall block conversion of any older accepted revision.
+- FR-2.9 The system shall create at most one job per quotation family. Once
+  converted, the family shall not accept further edits, revisions or conversions;
+  a repeat order shall start a new quotation family.
+- FR-2.10 Only the latest revision may be edited or transitioned. Creating a
+  revision shall preserve earlier history and require fresh acceptance of the
+  new revision before conversion; it shall not inherit accepted status.
+- FR-2.11 Sent, accepted and declined shall be explicitly recorded external
+  events; the system shall not send a message or infer customer acceptance.
 
 ### FR-3 Job tracking board (§2 item 3)
 
@@ -301,6 +414,14 @@ its own configured module actions (FR-10.1, § 6 open item).
   tracking board.
 - FR-3.9 The system shall allow a job to return to an earlier production
   stage only when the user supplies a rework reason.
+- FR-3.10 A converted job shall start with pending status and preparation stage.
+  Stage changes shall be allowed only while status is in production.
+- FR-3.11 The system shall require packing stage before ready for delivery.
+  Rework shall remain within an in-production job; a ready or delivered job
+  shall not reopen through a stage action.
+- FR-3.12 Within in-production jobs, forward stage changes may skip stages;
+  the system shall not imply the skipped stages were completed. Backward
+  changes require the rework reason specified in FR-3.9.
 
 ### FR-4 Source-of-enquiry note (§2 item 4)
 
@@ -312,24 +433,29 @@ its own configured module actions (FR-10.1, § 6 open item).
 ### FR-5 Activity/audit log (§2 item 5)
 
 - FR-5.1 The v1 activity history shall record the current in-app role/profile
-  label, timestamp, action, and changed information for changes to quotations
-  and jobs.
+  label, timestamp, action, and changed information for the events in
+  FR-5.2 and FR-5.4.
 - FR-5.2 The system shall record quotation creation, update, sending,
   acceptance, decline, revision creation, and conversion to a job, plus job
   status and production-stage changes, payment recording, and payment voiding.
 - FR-5.3 The v1 activity history shall not be presented as a secure identity
   audit trail. Production login and server-enforced identity are required
   before activity entries can be relied on for accountability.
+- FR-5.4 The system shall also record invoice issue/replacement, cancellation
+  settlement, refund recording and refund-record voiding, with reason and
+  linked records for corrections, settlements and voids.
 
 ### FR-6 Delivery status (§2 item 6)
 
 - FR-6.1 The system shall show delivery status as a visible field on the
   job board, not as hidden metadata.
 - FR-6.2 The system shall use the visible delivery statuses: not ready, ready,
-  and delivered.
+  delivered and not applicable (cancelled).
 - FR-6.3 The delivery status shall be not ready while a job is pending or in
   production, ready when a job is ready for delivery, and delivered when a
   job is delivered. Live courier tracking is not included in v1.
+- FR-6.4 A cancelled job shall display delivery as not applicable and retain
+  its last production stage in history.
 
 ### FR-7 Manual invoice creation (§2 item 7)
 
@@ -337,8 +463,11 @@ its own configured module actions (FR-10.1, § 6 open item).
   create an invoice from a job.
 - FR-7.2 The system shall not automatically create an invoice when a job is
   marked production-complete.
-- FR-7.3 The system shall allow invoice creation only when a job is ready for
-  delivery or delivered.
+- FR-7.3 The system shall allow manual invoice creation for a job created
+  from an accepted quotation when the job is pending, in production, ready
+  for delivery or delivered. It shall reject initial invoice creation for a
+  cancelled job or directly from a draft, sent or declined quotation.
+  Replacement of an existing invoice for cancellation settlement follows FR-7.11.
 - FR-7.4 When an invoice is created, the system shall preserve an invoice
   snapshot of the customer, line items, quantities, unit prices, discount,
   tax, and totals.
@@ -347,8 +476,29 @@ its own configured module actions (FR-10.1, § 6 open item).
 - FR-7.6 The system shall require each payable invoice to have a payment due
   date. The due date shall default to the invoice creation date, may be set to
   a later date, and shall not be earlier than the invoice creation date.
-- FR-7.7 The system shall allow only one invoice per job in v1. That invoice
-  may receive multiple payment records.
+- FR-7.7 The system shall allow at most one active invoice per job, retaining
+  all superseded invoices in the same job billing record. Receiving a deposit
+  or balance payment shall not create another invoice.
+- FR-7.8 The system shall correct an issued invoice only through a confirmed,
+  separately numbered replacement linked to the original, preserving the
+  original contents and marking it superseded.
+- FR-7.9 Before replacement, the system shall show changes to billing details,
+  lines, quantities, unit prices, discount, tax, due date and totals, alongside
+  differences from the agreed job snapshot. Admin shall confirm the correction
+  reason and record the basis of the customer agreement for commercial changes.
+- FR-7.10 A replacement shall retain the same job and customer identity and
+  shall not rewrite the job or earlier invoice snapshots. Changing the customer
+  identity requires a separately scoped resolution, not reassignment of receipts.
+- FR-7.11 For a cancelled job with an invoice, Admin shall explicitly confirm
+  the agreed final charge and its reason/agreement note through a replacement
+  invoice whose lines and totals represent that charge, including zero.
+  Cancelling a job alone shall not change its billed amount.
+- FR-7.12 A cancelled job with an invoice shall remain marked as requiring
+  billing review until its cancellation settlement is explicitly recorded;
+  an unchanged charge may be confirmed without issuing a redundant replacement.
+- FR-7.13 Invoice replacement shall preserve original payment/refund links
+  while applying their net amounts exactly once to the active invoice within
+  the same job billing record. It shall not create fictitious receipts or refunds.
 
 ### FR-8 Payment marking with confirmation (§2 item 8)
 
@@ -358,28 +508,75 @@ its own configured module actions (FR-10.1, § 6 open item).
   click.
 - FR-8.3 The system shall show a confirmation that summarizes the payment
   amount and date before recording it.
-- FR-8.4 The system shall represent a zero-value invoice as non-payable and
-  shall not silently mark it as paid.
+- FR-8.4 The system shall represent a zero-value active invoice with no net
+  receipts as non-payable, not paid. If net receipts remain, it shall show the
+  refund due instead of hiding it behind the zero invoice amount.
 - FR-8.5 The system shall record each payment separately with its confirmed
   amount and date.
-- FR-8.6 For a payable invoice, the system shall show an unpaid status before
-  any payment is recorded, a partially paid status when recorded payments are
-  less than the invoice total, and a paid status when recorded payments equal
-  the invoice total.
+- FR-8.6 The system shall derive the active invoice's payment state from the
+  job billing record: unpaid when net received is zero and the total is positive,
+  partially paid when net received is between zero and the total, and paid when
+  net received equals a positive total. Excess net received shall show refund
+  due; a zero total with zero net received shall show non-payable.
 - FR-8.7 The system shall not allow a recorded payment to be edited or
   deleted.
 - FR-8.8 The system shall allow a recorded payment to be voided only when the
   user supplies a reason.
 - FR-8.9 When a payment is voided, the system shall recalculate the invoice
-  payment status from its remaining recorded payments.
+  payment status from the remaining effective payments and refunds in the job
+  billing record, using the settlement rules below.
 - FR-8.10 The system shall prevent recorded payments from exceeding the
-  payable invoice total in v1. Refunds and credit notes are out of scope.
+  active invoice's remaining amount due. A later invoice reduction may create
+  a refund due without invalidating historical receipts. Formal credit-note
+  documents and automatic transfer/gateway refunds remain out of scope;
+  manually confirmed refund records are in scope.
 - FR-8.11 The system shall require each payment to record one payment method:
   cash, bank transfer, e-wallet / QR, or other.
 - FR-8.12 The system shall require a short payment-method note when other is
   selected.
 - FR-8.13 The system shall show the remaining balance for each payable invoice
-  after recorded payments are taken into account.
+  after effective payments and refunds are taken into account, using FR-8.19.
+- FR-8.14 The system shall allow a confirmed receipt before production to be
+  recorded against the job's issued invoice using the same Payment records
+  and balance calculation as later receipts. It shall not count a requested
+  or promised deposit as money received.
+- FR-8.15 The system shall retain the full invoice total when a deposit is
+  received; it shall reduce only the remaining balance and shall not create
+  a second invoice for that deposit or for the remaining balance.
+- FR-8.16 The system shall require each payment amount to be positive and no
+  greater than the invoice's remaining balance.
+- FR-8.17 The system shall not use payment status alone to change a job's
+  production or delivery status. A mandatory deposit threshold is out of scope.
+- FR-8.18 Cancelling a job shall not void its invoice, erase its payments or
+  record a refund. Existing balances and payment history shall remain visible
+  for review; financial resolution after cancellation is a separate workflow.
+- FR-8.19 The system shall calculate net received as effective payments minus
+  effective refunds for the job billing record. Amount due shall be the greater
+  of zero and active invoice total minus net received; refund due shall be the
+  greater of zero and net received minus active invoice total.
+- FR-8.20 Admin shall record a refund only after confirming that money was
+  returned externally, with positive amount, actual date, method, reason,
+  source payment and a transfer/receipt reference or cash acknowledgement note.
+  A promise to refund shall remain a refund due, not a completed refund record.
+- FR-8.21 A refund shall not exceed either the job's current refund due or
+  the source payment's effective unrefunded amount. Refunds spanning multiple
+  receipts shall use separate linked refund records.
+- FR-8.22 A refund shall reference a non-voided payment in the same job/customer
+  billing record. The system shall not transfer receipts between jobs or customers.
+- FR-8.23 The system shall preserve posted refunds without edit/delete. A
+  recording mistake may be voided with a reason and confirmation; this shall
+  recalculate settlement and shall not claim money was recovered from a customer.
+- FR-8.24 The system shall reject voiding a payment while it has effective
+  linked refunds. Voids correct erroneous records only and shall not substitute
+  for recording money actually returned.
+- FR-8.25 Payment, refund, invoice-replacement and cancellation-settlement
+  operations shall reject duplicate effects and stale/concurrent changes that
+  would violate the same-job, active-invoice or refundable-amount rules.
+- FR-8.26 Cancellation shall not apply an automatic forfeiture percentage or
+  fee. The system shall record the charge agreed for that job, not decide the
+  shop's commercial or legal entitlement to retain a deposit.
+- FR-8.27 The system shall reject a refund date earlier than its source
+  payment's actual date or later than the current local calendar date.
 
 ### FR-9 Contacts, Inventory & BOM, Stock Ledger (§2 item 9)
 
@@ -422,6 +619,14 @@ its own configured module actions (FR-10.1, § 6 open item).
 - FR-9.17 The system shall allow a BOM to be edited while it has not been
   used for automatic stock deduction.
 - FR-9.18 Creating or editing a BOM shall not change stock in v1.
+- FR-9.19 An inventory item shall start with zero stock. Opening stock shall
+  be recorded through a manual stock-in movement, never a direct balance edit.
+- FR-9.20 Stock-in and stock-out shall use positive quantities; an adjustment
+  shall use a nonzero signed difference. The confirmation shall show previous
+  balance, signed change and resulting balance before posting.
+- FR-9.21 A reversal shall negate the full quantity of one original non-reversal
+  movement, reference it, and be permitted at most once. It shall reject a
+  negative resulting balance and shall not erase the original movement.
 
 ### FR-10 Role display (§2 item 10)
 
@@ -454,9 +659,10 @@ its own configured module actions (FR-10.1, § 6 open item).
   breakdowns are represented as separate quotation lines in v1.
 - A declined quotation cannot be converted to a job; an accepted quotation
   can be converted only after the user confirms the shown summary.
-- Editing a sent or accepted quotation creates a linked draft revision; the
-  earlier revision remains available in quotation history, and only the
-  latest accepted revision can be converted to a job.
+- Revising a sent, accepted or declined quotation creates a linked draft;
+  only the latest revision, itself accepted, may convert. A newer draft blocks
+  the old acceptance. After conversion, another conversion/revision of that
+  family is rejected; a repeat order uses a new family.
 
 #### Jobs and delivery
 
@@ -470,36 +676,58 @@ its own configured module actions (FR-10.1, § 6 open item).
   preparation, production, quality check, or packing.
 - Returning a job to an earlier production stage requires a rework reason and
   is recorded in the activity log.
-- The job board visibly shows not ready, ready, or delivered in accordance
-  with the job's current lifecycle status.
+- A new job starts pending/preparation. Stage changes require in-production
+  status; readiness requires packing. Ready/delivered jobs cannot reopen.
+- The job board visibly shows not ready, ready, delivered or not applicable
+  for cancellation, consistently with the job lifecycle.
 
 #### Invoices and payments
 
-- An invoice can be created manually for a job that is ready for delivery or
-  delivered, and is not created automatically when production is complete.
+- An invoice can be created manually from a pending, in-production, ready or
+  delivered job created from an accepted quotation. A cancelled job cannot
+  receive an initial invoice; an existing invoice may be replaced through
+  cancellation settlement. Production completion never automatically issues one.
+- A RM700.00 pre-production receipt against RM1,700.00 leaves RM1,000.00 due;
+  a later RM1,000.00 receipt settles the same invoice. Promised deposits do not
+  change the balance, and payment does not advance production status.
+- Cancellation after a receipt retains the invoice and payment history;
+  no automatic refund, invoice void or payment deletion occurs.
 - An issued invoice retains its customer, items, quantities, prices, discount,
   tax, and totals if the related job or quotation changes later.
 - A payable invoice has a due date no earlier than its creation date and shows
-  its remaining balance after recorded payments.
-- A job cannot receive a second invoice; its single invoice may receive
-  multiple payments.
+  its remaining balance after effective payments and refunds.
+- A job cannot have two active invoices. A correction retains the superseded
+  invoice and links its replacement; existing receipts count once toward the
+  current balance without changing their original invoice references.
 - The activity history identifies the current in-app role/profile label, time,
-  and action for the events listed in FR-5.2, and does not claim secure
+  and action for the events listed in FR-5.2/FR-5.4, and does not claim secure
   identity attribution.
 - A payment is not recorded until its amount and date are confirmed; a
   zero-value invoice is visibly non-payable.
-- A payable invoice shows unpaid before payment, partially paid after a
-  payment that is less than its total, and paid once recorded payments equal
-  its total.
+- An active invoice shows unpaid, partially paid, paid, non-payable or refund
+  due according to its total and net effective receipts after refunds.
 - A recorded payment cannot be edited or deleted. A voided payment requires a
   reason, is recorded in the activity log, and recalculates the invoice status;
   a payment that would exceed the invoice total is rejected.
 - Each payment records its method; selecting other requires a short note.
+- With RM700.00 received, replacing RM1,700.00 with RM1,500.00 leaves RM800.00
+  due. Replacing it with RM500.00 instead leaves RM200.00 refund due; recording
+  the actual RM200.00 refund settles that RM500.00 charge.
+- Cancelling after RM700.00 received and confirming RM200.00 as the agreed
+  final charge leaves RM500.00 refund due. Recording that external refund leaves
+  RM200.00 net received, zero amount due and zero refund due. A zero final
+  charge instead requires the full RM700.00 refund to settle.
+- A refund promise does not change net receipts. Reject an excessive refund,
+  wrong-job source payment, duplicate refund, stale correction and payment void
+  with an effective linked refund. Preserve original invoice and job snapshots.
 
 #### Contacts, inventory, BOM, and Stock Ledger
 
 - A contact cannot be saved without a display name and at least one phone
   number or email address; address and internal notes may be left empty.
+- An item begins at zero; opening stock posts a movement. Signed adjustment
+  and full reversal previews agree with the resulting balance; a second reversal,
+  reversal of a reversal and a negative resulting balance are rejected.
 - A stock-in, stock-out, or adjustment movement shows its item, quantity,
   date, reason, actor, and resulting balance. A posted movement cannot be
   edited or deleted; a correction creates a linked reversal or adjustment.
@@ -542,15 +770,121 @@ its own configured module actions (FR-10.1, § 6 open item).
 - NFR-2.2 The system shall default locale to `en-MY`.
 - NFR-2.3 The system shall default timezone to `Asia/Kuala_Lumpur`.
 
+### NFR-3 Maintainability — planning requirements
+
+Requested 2026-09-08 for later implementation. These requirements do not
+authorize refactoring the existing prototype during documentation work.
+
+- NFR-3.1 Each feature shall keep its screens, feature-specific components,
+  data access and business rules in separately identifiable units, following
+  SDD §2. App entry points shall compose features rather than implement them.
+- NFR-3.2 Money calculations and lifecycle rules shall be testable without
+  rendering a page or starting a server.
+- NFR-3.3 Frontend screens shall access data through an explicit feature
+  interface so mock data can be replaced without rewriting screen logic.
+- NFR-3.4 Each delivered journey shall identify its SRS requirements and
+  include verification of its calculations, transitions and failure paths.
+
+### NFR-4 Security — proposed real-data release targets
+
+Security planning was requested on 2026-09-08. The following are proposed
+acceptance targets for the later persistent system, not implemented controls
+or an expansion of the display-only prototype. Agree their detailed design
+before backend implementation; verify them before using real business data.
+
+| ID | Proposed target | Required verification |
+|---|---|---|
+| SEC-1 | Protected business operations require authenticated identity and server-side permission checks on every request, with denial by default | Direct API requests from signed-out and unauthorized accounts cannot read or change protected records |
+| SEC-2 | The server enforces record ownership and ignores client-supplied identity or role as proof of access | Changing a record identifier, role field or ownership field cannot bypass access restrictions; test cross-company access if company ownership is introduced |
+| SEC-3 | Production sessions use encrypted transport, expire and can be revoked; browser session design includes appropriate cookie and CSRF controls | Expired/revoked sessions fail; logout invalidates access; test cross-site requests for cookie-authenticated writes |
+| SEC-4 | Secrets remain outside Git, browser bundles and logs; diagnostics omit passwords, session tokens and unnecessary personal data | Inspect built assets/configuration and representative failure logs with synthetic credentials |
+| SEC-5 | The server validates inputs, recalculates commercial values and rejects illegal lifecycle changes independently of the frontend | Tampered totals, invalid transitions and malformed requests fail without partial writes |
+| SEC-6 | Sensitive writes resist duplicate requests and concurrent updates; protected history identifies the authenticated actor | Retried conversion/payment/stock actions do not duplicate effects; competing updates cannot silently overwrite records |
+| SEC-7 | Security review and recovery checks are release conditions | Review dependencies and application access paths, resolve release-blocking findings, and demonstrate backup restoration against agreed recovery targets |
+
+Security guidance: [OWASP Authorization](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html),
+[Session Management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
+and [Secrets Management](https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html).
+These inform the design; their inclusion is not a security certification.
+
 ## 6. Open items
 
-- Detailed field-level requirements per screen (exact fields, filters,
-  validation rules) beyond §4/§5 — deferred to a later, separately scoped
-  pass.
+### Consolidated business decisions
+
+The user accepted D1, D2, D4 and D5 together on 2026-09-09. D3 was accepted
+through the billing planning batches. Their applicable rules are incorporated
+into the requirements and SDD. Documents remain Draft pending overall review;
+this approval does not authorize coding or make prototype permissions secure.
+
+| ID | Accepted direction | Implementation dependency |
+|---|---|---|
+| D1 | One job per quotation family. Only the latest revision, itself accepted, may convert. Repeat orders use a new family. | FR-2.8–FR-2.11 and contract |
+| D2 | Production: start pending/preparation; stage changes occur while in production; require packing before marking ready. Cancelling displays delivery as not applicable and retains the last stage for history. Rework remains within in-production jobs; ready/delivered jobs do not silently reopen. | Job transition table and board actions |
+| D3 | Direction expanded 2026-09-09: pre-production receipts, controlled invoice replacement, manual confirmed refunds and explicit cancellation settlement. FR-7/FR-8 now define these workflows. No automatic transfers or deposit-forfeiture policy. | Exact billing API/schema and acceptance implementation |
+| D4 | Zero opening balance; stock-in/out positive, adjustments signed; preview balance effect; full linked reversal once with no negative balance. | FR-9.19–FR-9.21 and contract |
+| D5 | Future Staff access: start new accounts with no granted actions, then let Admin grant production access individually. Financial/customer details are withheld unless explicitly granted. Keep individual configuration; no automatic production template is introduced. | Real-data authorization matrix; prototype labels are unchanged |
+
+### Invoice correction and cancellation settlement — D3-C
+
+The manual-refund planning expansion on 2026-09-09 supersedes the earlier
+no-payment-history-only correction proposal. FR-7/FR-8 are authoritative.
+These are operational records; formal tax documents, legal entitlement to
+retain a deposit and accounting compliance are not established by this design.
+
+| Situation | Admin action | Result |
+|---|---|---|
+| Wrong issued invoice, no receipts | Review corrected values, reason and agreement; confirm replacement | Original remains readable, one new active invoice, amount due from corrected total |
+| Wrong issued invoice, receipts exist | Same replacement process, showing net receipts and resulting amount/refund due | Receipts remain attached to their original invoice and count once within the same job billing record |
+| Cancelled job with invoice | Review cancellation charge agreed with customer; confirm unchanged charge or replacement with agreed lines/total | No automatic retention/refund; active total determines amount due or refund due |
+| Refund due | Return money outside the app, then confirm a linked refund record | Net received reduces; refund due reduces; no gateway call |
+| Mistaken payment/refund entry | Review history and reasoned record void, subject to dependency checks | Original retained; balances recomputed; no claim of an actual money transfer |
+
+A cancelled job with no invoice and no receipts has nothing to refund or
+settle financially. Creating a new cancellation fee without an existing
+invoice is not included. Cross-customer corrections, cross-job credit balances,
+formal credit notes and automated refunds remain deferred. Before real-data
+release, separately validate required document and retention obligations;
+this operational design makes no tax/accounting compliance claim.
+
+### Validation baseline for the screen walkthrough
+
+The SDD §5 contract baseline defines numeric precision, maximum values,
+required/nullable fields and error behaviour for the planned implementation.
+These technical limits preserve the calculation and immutability rules;
+frontends and backend must validate the same limits.
+
+| Area | Baseline detail | Existing requirements retained |
+|---|---|---|
+| Quotation header | Due date and enquiry source are document fields, not required on every line; sent/accepted are Admin-recorded external events, with no message sent by the app | Customer, due date, source and one complete line required before sent; FR-1.6, FR-4 |
+| Price/quantity | Non-negative unit price and discount; tax 0–100%; quantity positive with at most 3 decimal places; money inputs at most 2 decimal places | Decimal arithmetic and half-up calculation order; discount cannot exceed subtotal; FR-1.8–FR-1.13 |
+| Payment | Positive amount no greater than remaining balance; reject future payment dates; allow a past actual receipt date | Explicit confirmation, separate immutable records and reasoned void; FR-8 |
+| Stock/BOM | Positive in/out/component quantities with at most 3 decimal places; adjustments are nonzero signed differences under D4 | One unit per item, no negative balance and no automatic BOM deduction; FR-9 |
+| Referenced records | No delete endpoint for referenced contacts/items; archive/inactive UI remains deferred | Do not delete historical commercial or ledger evidence |
+
+### Technical decisions before real-data development
+
+- Agree NFR-4 targets, select authentication/session implementation, and map
+  D5 grants to named operations such as convert, issue, record, void and post.
+- SDD §4 defines company ownership and same-company reference constraints;
+  bind that model to authenticated membership before real-data deployment.
+  Single-company launch does not imply multi-company management UI.
+- SDD §§4–5 now specify business API schemas, precision/constraints, payload
+  limits, pagination, idempotency and conflict behaviour. Login/grant endpoints,
+  rate limits and deployable schema migrations remain backend design work.
+- Agree backup retention, acceptable data loss and recovery time; verify a
+  restore before real-data use. No numerical target is assumed here.
+- Prototype refresh/reset behaviour, screen states and test mapping now have
+  a proposed design in SDD §5; they do not require production infrastructure.
+
+### Existing scope decisions
+
+- Complete detailed screen fields, filters and validation incrementally in
+  this planning work before each dependent implementation task.
 - Cross-cutting acceptance checks are recorded in § 4. Full traceability from
   user problem through requirement, planned API operation, database
-  transaction, and acceptance test remains a later documentation task;
-  API/database links remain design artifacts per `docs/SDD.md`.
+  transaction, and acceptance test is to be completed per journey before
+  its implementation; API/database links remain design artifacts per
+  `docs/SDD.md`.
 - **Decided 2026-09-02:** Role permissions beyond visual distinction
   (FR-10) stay out of scope for v1 — Identity/Roles remains a
   frontend-only display concern; see `docs/SDD.md` § 8.
@@ -559,6 +893,9 @@ its own configured module actions (FR-10.1, § 6 open item).
   and Delete actions. Admin retains business-level access; every Staff
   account is configured individually, including any financial access. This
   does not change v1 scope or authorize login, authentication, or enforcement.
+  These generic actions must map to explicit business operations such as
+  conversion, invoice issue, payment void and stock posting. A permission
+  must never override immutable-record or lifecycle rules.
 - **Reviewed 2026-09-08:** The existing requirements for exact quantity
   preservation, visible save errors, payment-derived invoice status, and an
   immutable manual Stock Ledger with reversals remain deliberate v1 controls.

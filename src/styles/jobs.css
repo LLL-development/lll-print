@@ -1,0 +1,257 @@
+/* --- Print Jobs View: Summary Ribbon & Scan-Friendly Queue --- */
+.jobs-summary-strip {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.jobs-summary-pill {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  padding: 5px 12px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.summary-pill-label {
+  color: var(--muted);
+}
+
+.jobs-summary-pill b {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.job-board-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.toolbar-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 260px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+  height: 38px;
+}
+
+.toolbar-search-wrap:focus-within {
+  border-color: var(--green);
+}
+
+.search-icon {
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.search-input {
+  border: 0;
+  outline: none;
+  background: transparent;
+  width: 100%;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.toolbar-filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.filter-select-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-select-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.filter-select {
+  height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 0 10px;
+  color: var(--ink);
+  font-size: 13px;
+  outline: none;
+}
+
+.filter-select:focus {
+  border-color: var(--green);
+}
+
+/* Structured Job Queue */
+.structured-job-queue {
+  display: flex;
+  flex-direction: column;
+}
+
+.queue-list-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(0, 1.2fr) minmax(0, 1.1fr);
+  gap: 16px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.queue-list-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+}
+
+.structured-job-card {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(0, 1.2fr) minmax(0, 1.1fr);
+  align-items: center;
+  gap: 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.structured-job-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.04);
+}
+
+.queue-card-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.queue-number-badge {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #047857;
+  padding: 6px 9px;
+  border-radius: 8px;
+  font: 800 13px Manrope;
+  flex-shrink: 0;
+}
+
+.queue-item-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.queue-customer-name {
+  font-size: 14px;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.queue-spec-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-primary-desc {
+  color: #334155;
+}
+
+.queue-spec-divider {
+  color: #cbd5e1;
+}
+
+.queue-qty-pill {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.queue-extra-count {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.queue-card-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.queue-card-status-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+}
+
+.queue-due-info {
+  text-align: right;
+}
+
+.queue-due-caption {
+  display: block;
+  font-size: 9px;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.queue-due-val {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.queue-view-btn {
+  border: 1px solid var(--line);
+  background: #f8fafc;
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.12s ease;
+}
+
+.queue-view-btn:hover {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}

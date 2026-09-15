@@ -1,0 +1,498 @@
+/* --- Contacts View: Benchmark Operational Design --- */
+.contacts-view {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* 1. Benchmark Hero Card */
+.contacts-hero-card {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 22px 24px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.contacts-hero-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.contacts-hero-icon-badge {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  color: #0f766e;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(15, 118, 110, 0.12);
+}
+
+.contacts-hero-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.contacts-hero-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.contacts-hero-eyebrow .eyebrow-tag {
+  color: #047857;
+}
+
+.contacts-hero-eyebrow .eyebrow-sep {
+  color: #94a3b8;
+}
+
+.contacts-hero-eyebrow .eyebrow-sub {
+  color: #64748b;
+}
+
+.contacts-hero-title {
+  font: 800 24px Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: var(--ink);
+  margin: 0;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.contacts-hero-desc {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.contacts-hero-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.contacts-primary-btn {
+  min-height: 44px;
+  padding: 0 20px;
+  font-size: 13px;
+  font-weight: 800;
+  border-radius: 10px;
+  background: var(--green);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  border: 1px solid var(--green-dark);
+  box-shadow: 0 2px 8px rgba(15, 118, 110, 0.25);
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.contacts-primary-btn:hover {
+  background: var(--green-dark);
+  transform: translateY(-1px);
+}
+
+.contacts-primary-btn .btn-plus {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+
+
+/* 3. Toolbar: Search & Count */
+.contacts-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.contacts-search-box {
+  flex: 1;
+  min-width: 240px;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.contacts-search-icon {
+  position: absolute;
+  left: 14px;
+  color: #94a3b8;
+  font-size: 15px;
+  pointer-events: none;
+}
+
+.contacts-search-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 38px 0 38px;
+  border-radius: 10px;
+  border: 1px solid #d9e3de;
+  background: #ffffff;
+  font-size: 13px;
+  color: var(--ink);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.contacts-search-input:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.15);
+}
+
+.contacts-search-clear {
+  position: absolute;
+  right: 10px;
+  border: 0;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 14px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.contacts-search-clear:hover {
+  color: var(--ink);
+  background: #f1f5f9;
+}
+
+.contacts-count-badge {
+  background: #eef6f2;
+  color: var(--green-dark);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 99px;
+  border: 1px solid #d0e4d9;
+  white-space: nowrap;
+}
+
+/* 4. Customer Cards Grid */
+.contacts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.customer-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid var(--green);
+  border-radius: 12px;
+  padding: 18px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+  box-sizing: border-box;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.customer-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.customer-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.customer-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #ecfdf5;
+  border: 1px solid #bbf7d0;
+  color: #047857;
+  display: grid;
+  place-items: center;
+  font: 800 13px Manrope, sans-serif;
+  flex-shrink: 0;
+}
+
+.customer-card-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.customer-card-name {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ink);
+  margin: 0;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.customer-badges-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.customer-card-id {
+  font-size: 10px;
+  font-weight: 700;
+  color: #64748b;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+}
+
+.customer-type-pill {
+  font-size: 10px;
+  font-weight: 700;
+  color: #0f766e;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.customer-card-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.customer-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #334155;
+  word-break: break-all;
+}
+
+.customer-detail-icon {
+  color: #94a3b8;
+  font-size: 13px;
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.customer-phone-link {
+  color: var(--green);
+  font-weight: 700;
+  text-decoration: none;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.customer-phone-link:hover {
+  text-decoration: underline;
+}
+
+.customer-email-link {
+  color: #64748b;
+  text-decoration: none;
+}
+
+.customer-email-link:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.customer-detail-muted {
+  color: #94a3b8;
+  font-style: italic;
+  font-size: 12px;
+}
+
+.customer-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.customer-activity-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.customer-activity-chip .activity-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+}
+
+.btn-quote-action {
+  min-height: 44px;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 700;
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.btn-quote-action:hover {
+  background: #d1fae5;
+  border-color: #6ee7b7;
+  transform: translateY(-1px);
+}
+
+/* 5. Clean Empty States */
+.contacts-empty-state {
+  background: #ffffff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 14px;
+  padding: 48px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.contacts-empty-state .empty-state-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+}
+
+.contacts-empty-state h3 {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--ink);
+  margin: 0;
+}
+
+.contacts-empty-state p {
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 360px;
+  margin: 0;
+}
+
+.contacts-empty-state .empty-state-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+/* Responsive Rules down to 320px */
+@media (max-width: 880px) {
+  .contacts-metrics-ribbon {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .contacts-hero-card {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 18px;
+    gap: 16px;
+  }
+
+  .contacts-hero-actions {
+    width: 100%;
+  }
+
+  .contacts-primary-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .contacts-search-box {
+    min-width: 100%;
+  }
+
+  .contacts-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .customer-card-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .btn-quote-action {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .contacts-metrics-ribbon {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 360px) {
+  .contacts-view {
+    gap: 14px;
+  }
+
+  .contacts-hero-card {
+    padding: 14px;
+  }
+
+  .customer-card {
+    padding: 12px;
+  }
+
+  .customer-card-name {
+    font-size: 15px;
+  }
+}
