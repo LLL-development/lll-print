@@ -3,7 +3,7 @@
 Project: LLL Print
 Status: Draft — the current phase includes completing and reviewing the SDD
 development baseline; it remains Draft until accepted.
-Last updated: 2026-09-09
+Last updated: 2026-09-24
 
 This document describes how the system specified in `docs/SRS.md` is
 designed. It may describe the planned modular-monolith direction and the
@@ -51,8 +51,8 @@ Feature separation below is a target for later implementation:
   requirement (NFR-1).
 - `src/lib/` — cross-cutting utilities not tied to one feature (e.g.
   `formatters.ts` for MYR/`en-MY`/`Asia/Kuala_Lumpur` formatting, NFR-2).
-- Feature areas group related user tasks (quotations, jobs, billing,
-  contacts and inventory). A feature may cover several SRS requirement
+- Feature areas group related user tasks (quotations, jobs, billing and
+  contacts). Inventory is deferred. A feature may cover several SRS requirement
   groups; frontend screens do not need a one-to-one correspondence with
   backend endpoints.
 
@@ -89,7 +89,6 @@ src/
     jobs/                 Production board, job detail and transitions
     billing/              Invoices, payment forms and balances
     contacts/             Customer and supplier screens
-    inventory/            Items, BOM and manual ledger
   lib/                    Shared formatting and infrastructure helpers
   test/                   Shared test setup
 ```
@@ -115,8 +114,8 @@ A growing file approaching several hundred lines triggers a responsibility
 review; line count alone is not an architecture rule. Do not extend
 `PrototypeApp.tsx` into the permanent implementation of all modules.
 
-Modules use explicit interfaces. Cross-module transactions, such as converting
-a quotation into a job and recording history, need one coordinating use case
+Modules use explicit interfaces. Cross-module transactions, especially Confirm
+order across quotation, job, billing, invoice and history, need one coordinating use case
 and one transaction boundary. Splitting code must not split an atomic business
 operation into unrelated writes.
 
@@ -152,18 +151,18 @@ target shape for a later, separately authorized implementation phase.
 
 | Module | Covers (SRS requirement IDs) | Notes |
 |---|---|---|
-| Quotations | FR-1, FR-2, FR-4 | Owns quotation lifecycle and source-of-enquiry note. |
-| Jobs | FR-3, FR-6 | Owns job stage tracking and delivery status. |
-| Billing | FR-7, FR-8 | Owns manual invoice creation and confirmed payment marking; deliberately separate from Jobs so invoice creation stays a distinct step (FR-7.2). |
-| Contacts | FR-9.1, FR-9.4–FR-9.6 | Customers/suppliers. |
-| Inventory | FR-9.2–FR-9.3, FR-9.7–FR-9.21 | BOM and stock ledger. |
+| Quotations | FR-1, FR-2, FR-4 | Owns private priced-form submission, submitted-order review and quotation history. |
+| Jobs | FR-3, FR-6 | Owns release, configurable production progress and fulfilment. |
+| Billing | FR-7, FR-8 | Owns issued-invoice history, confirmed payments, corrections and refunds. It participates in the atomic Confirm order operation rather than adding a separate first-invoice step. |
+| Contacts | FR-9 | Owns reusable customer details while historical documents retain snapshots. |
+| Inventory | Deferred | Items, BOM and Stock Ledger are not in current scope. |
 | Audit | FR-5 | Cross-cutting: records changes from Quotations, Jobs, Billing modules. |
-| Identity/Roles | FR-10 | v1 scope is UI-only role display for Admin and Staff; no enforcement logic is planned. A future authorized phase would keep Admin business-level access and configure each Staff account's module actions individually (SRS §2, §6). |
+| Identity and action grants | FR-10, NFR-4 | Admin manages Staff accounts and grants explicit business actions. Enforcement is required before real data; its implementation remains separately scoped. |
 
 Each planned backend module would expose REST/OpenAPI operations and own its
 PostgreSQL/Prisma schema slice, consistent with "tenant-ready ownership
-boundaries" (SRS § 1). Identity/Roles remains a frontend-only display concern
-for v1, as recorded in § 8.
+boundaries" (SRS § 1). The current synthetic frontend may demonstrate projected
+views, but it is not evidence that identity or authorization is implemented.
 
 ## 4. Data design
 
@@ -176,63 +175,209 @@ are later implementation/security work, not created artifacts.
 
 ### Sales and Jobs
 
+One priced form submission creates a submitted quotation only. During review,
+Admin sets the required deposit from RM0 up to the invoice total. One Confirm
+order action then confirms the quotation, creates its single Job and issues
+its initial Invoice atomically. The Job begins awaiting release, showing any
+unmet deposit or mockup condition. RM0 needs no receipt; a positive deposit
+needs confirmed payment. Payment never releases the job automatically.
+
+Admin first prepares a customer-specific form from reusable company catalogue
+options. Catalogue categories may include clothing type, sleeve type, material,
+GSM, colour, size, printing method, print location/component and other
+company-defined choices. Admin selects only the options to display, can add a
+one-time option, and sets every applicable price before sharing. The customer
+may freely combine the displayed choices; this design has no compatibility
+matrix or automatic quantity-discount tiers. Admin remains responsible for
+offering suitable choices and uses Needs changes when a submitted combination
+cannot be produced.
+
+Pricing is assembled from an Admin-prepared base price plus applicable option
+charges. A component can be free, charged per piece, charged once per order or
+use a fixed item adjustment. Size adjustments are individually configurable,
+so a company may charge from 3XL while another uses different amounts or no
+plus-size charge. Saved customer-specific prices may prefill preparation, but
+Admin may replace them for the individual form. All price labels, methods and
+amounts are copied into the shared form; there is no hidden automatic price
+rule after sharing.
+
+A shared form is a fixed offer. Admin may remove the old link and create/share
+a new prepared form, but cannot silently change the options or prices behind a
+link the customer already received. The removed link cannot be reactivated and
+any incomplete draft under it is discarded. Catalogue options may be edited or
+deleted for future preparation with no activate/archive workflow. A later
+option with the same label is a new record. Existing shared forms and submitted
+quotations remain readable from their copied snapshots. Once submitted, the
+quotation remains historical; Needs changes leads to a newly prepared form
+rather than deleting the earlier submission.
+
+The fixed-offer rule applies to offered choices and prices, not to unnecessary
+workflow rigidity. Admin and customer normally discuss feasibility outside the
+system first. Due date, recipient and fulfilment details are operational facts
+the form records and may prefill for convenience; the customer may complete or
+correct the fields exposed on that form before submission. The system does not
+run a production-capacity approval or treat the due date as a guaranteed
+schedule. Admin reviews the complete submission before Confirm order.
+
+The submitted-order review is one drawer containing customer, items,
+quantities, current mockup, fulfilment method, shipping charge, total and
+missing-information indicators. Its deposit field starts blank and has no
+automatic percentage. Admin chooses RM0 through the invoice total, then uses
+one Confirm order action. Needs changes remains secondary in the same drawer;
+the normal flow has no separate quotation-detail, job-creation or first-invoice
+page.
+
+Mockup attachment remains an in-context action on the form or current job
+drawer. Customer, Admin or Staff granted Attach mockup may upload a revision
+without entering a reason. Each upload appends a version with server-owned
+uploader/time metadata; the latest is current and earlier versions remain
+readable. One current version is required at release. A later upload updates
+the factory view with a non-blocking Mockup updated notice and does not stop
+production, reopen steps or require a separate approval automatically.
+
+Admin or Staff granted Manage production workflow maintains one company-level
+sequence of broad checkpoints such as printing, sewing, QC and packing. The
+control opens from the Production screen as an in-context drawer or modal, not
+a separate management destination. The system does not require workflow
+templates, method-specific task lists or detailed factory instructions.
+Changes apply automatically to unfinished jobs, while completed/skipped step
+events remain immutable history. Added unfinished work reopens a completed job
+before handover and clears readiness; shipped/collected jobs stay closed. A
+granted action may complete, skip or rework a step; skip and rework each
+require a short free-text reason and create history.
+Release immediately puts the job in production at its first current step;
+there is no separate start action. Staff normally see only relevant current
+work and complete the current permitted step with one action. The system owns
+the actor/time fields, advances to the next step automatically and requires no
+normal completion note or manual next-status selection. When every step is
+completed or reasoned-skipped, it marks production complete automatically;
+there is no separate Complete production action.
+No per-job Staff assignment is required. Every Staff account granted the
+current-step action may see and attempt it; the first valid action records its
+actor, while a stale competing action fails without duplicating progress.
+Named workload assignment remains deferred rather than adding Admin entry to
+each job.
+The factory task projection contains job number, due date, product
+specifications, size quantities, mockup, current-step instructions, essential
+production notes and permitted actions. It omits customer identity/contact
+details, prices, invoices, payment history and unrestricted Admin notes unless
+separately granted. A Shipped or Collected projection may add only the required
+recipient name, phone, address or pickup location, fulfilment method and a
+simple Ready or Not paid yet indicator. That fulfilment grant does not reveal
+invoice contents or payment history.
+Before handover, Admin alone may use Reopen for rework on a production-complete
+job. The request selects one return step and includes a short
+reason. It preserves prior history, puts the job back in production at that
+step, clears readiness, and makes that step and every following step pending
+completion or a new reasoned skip. This is not a normal step action and is not
+Staff-grantable.
+Production completion and full settlement automatically enable the applicable
+Shipped or Collected handover action. Admin grants each Staff account explicit
+business actions; generic View/Add/Edit/Delete groupings are not the policy.
+
+Full settlement is the normal handover gate. After production completion,
+Admin alone may approve an exceptional Shipped or Collected handover while a
+balance remains. That operation requires a reason, records the approval in
+history and leaves the balance open and visibly Not paid yet. It is not a
+Staff-grantable handover path. If a payment is
+voided after release, recalculate the balance but do not reverse or stop
+physical production automatically; normal readiness remains blocked unless
+the balance is settled or Admin uses this exception.
+
+Fulfilment remains in the completed job drawer. Shipped or Collected uses one
+confirmation and server-owned actor/current-time values while reusing the
+saved recipient/address or pickup location. Collected exposes no extra entry.
+Shipped keeps optional courier and tracking/reference fields collapsed under
+Add shipping details; blanks never block confirmation. The Admin-only Allow
+handover with balance action appears in the same drawer only when production
+is complete and an unpaid balance remains, and still requires its reason.
+Detailed handover history is secondary detail.
+
+Record payment is an in-context action in the current job/order drawer rather
+than a required navigation to a separate invoice page. It preselects the local
+current date and offers the amount still needed to satisfy the deposit, the
+remaining balance, or a custom amount. The user may correct the actual receipt
+date, selects the required payment method and confirms the amount/date once.
+The result appends one immutable Payment and refreshes balance, release and
+Ready/Not paid yet indicators. Detailed invoice and payment history stays
+available as secondary detail rather than blocking the normal action.
+
+Inventory, BOM and Stock Ledger are deferred and have no active entities,
+routes, grants or acceptance checks in this design.
+
 | Entity | Core key fields | Relationships and historical-data rule |
 |---|---|---|
-| **Contact** | `contact_id`; `contact_type` (customer or supplier); `display_name`; `phone`; `email`; `address`; `internal_notes` | A customer Contact may have many Quotations and Jobs. A supplier Contact may be linked to many Inventory Items. Each Contact must have a display name and at least one of phone or email (FR-9.5). |
-| **Quotation** | `quotation_id`; `quotation_number`; `customer_contact_id`; `revision_number`; `previous_quotation_id`; `status`; `source_of_enquiry_note`; `due_date`; `subtotal`; `discount_amount`; `tax_rate`; `tax_amount`; `grand_total`; `notes` | One Quotation has many Quotation Lines. A sent or accepted Quotation is not edited directly: a linked draft revision is created instead (FR-2.6–FR-2.8). Only an accepted latest family revision may create one Job for that family. |
-| **Quotation Line** | `quotation_line_id`; `quotation_id`; `line_number`; `description`; `quantity`; `unit`; `unit_price`; `line_total` | Belongs to one Quotation. Its positive quantity is the ordered number of finished items or service units and contributes to the quotation totals (FR-1.10–FR-1.12). |
-| **Job** | `job_id`; `job_number`; `source_quotation_id`; `customer_contact_id`; `status`; `production_stage`; `delivery_status`; `due_date`; `cancellation_reason`; `rework_reason`; `quotation_snapshot` | One Job is created from one accepted Quotation revision. The Job stores a snapshot of the agreed customer, lines, quantities, prices, tax, totals, source-of-enquiry note, and relevant notes, so later quotation revisions do not alter historical job data (FR-3.3). A Job has many Job Lines and one billing record once invoiced, with at most one active Invoice. |
-| **Job Line** | `job_line_id`; `job_id`; `source_quotation_line_id`; `line_number`; `description`; `quantity`; `unit`; `unit_price`; `line_total` | Belongs to one Job and is copied from the accepted Quotation Line at conversion. The stored values form part of the Job snapshot and are not recalculated from later quotation changes. |
+| **Contact** | `contact_id`; `display_name`; `phone`; `email`; fulfilment defaults; `internal_notes` | One customer Contact may have many private form links, Quotations and Jobs. Later contact corrections affect future use, not historical snapshots. |
+| **Catalogue Option** | `catalogue_option_id`; category; label; display order; default pricing metadata | Reusable company choice selected while preparing forms. Admin may edit or delete it. Prepared-form and quotation snapshots never depend on the live record remaining. No compatibility graph or activation lifecycle is required. |
+| **Customer Price Default** | `customer_price_default_id`; customer; applicable catalogue/base/component reference; charge method; amount | Optional reusable starting price for one customer. It only prefills a new prepared form and never updates an already shared form or historical quotation. |
+| **Prepared Order Form** | `prepared_form_id`; customer; state (`draft` or `shared`); optional due-date/fulfilment initial values; expiry; created/shared/removed metadata | Admin-owned preparation root. Draft options and prices are editable. Sharing freezes offered choices/prices, while exposed operational fields may be completed or corrected before submission. Removing a shared form permanently disables its link and discards its incomplete customer draft. |
+| **Prepared Form Option** | form; category; copied label; display order; base/adjustment amount; charge method; source catalogue reference (nullable) | Contains only choices Admin wants this customer to see. Supports catalogue-derived and one-time choices. Options combine freely; no compatibility matrix or quantity tier selects a different price. |
+| **Private Form Link** | `form_link_id`; `prepared_form_id`; customer; token digest; expiry/removal/submission metadata | Bound to one frozen Prepared Order Form, company and customer. The raw token is never stored or logged. A removed, expired or submitted link cannot be reused or reactivated. |
+| **Quotation** | `quotation_id`; `quotation_number`; `customer_contact_id`; `status`; `source_of_enquiry_note`; `due_date`; totals; fulfilment choice; shipping charge; snapshot fields | Submission creates `submitted`. Admin may request changes or cancel it. Confirm order changes it to `confirmed` and creates exactly one Job, billing record and initial Invoice in the same transaction. |
+| **Quotation Item** | selected clothing/sleeve/material/GSM/colour/printing values; size quantities; base unit price; copied labels and price effects; totals | Belongs to one Quotation. Multiple clothing items may coexist. Each preserves the choices, grouped size quantities and prices displayed on the submitted form. |
+| **Quotation Charge** | quotation/item reference; copied component label; charge method; applicable quantity; unit amount; total | Preserves transparent free, per-piece, per-order and fixed-item charges, including size and printing/component adjustments. |
+| **Mockup / Mockup Version** | owner record; object metadata; current-version pointer; uploader; uploaded time | Versions append; the newest is current and older versions remain readable. A current version is required for release, not for initial submission. |
+| **Job** | `job_id`; `job_number`; `source_quotation_id`; `status`; current due date, fulfilment details, production notes and version | Created only by Confirm order and starts `awaiting_release`. It begins from the confirmed quotation snapshot, then remains Admin-editable until Shipped, Collected or Cancelled. Its current values are the factory's working instruction, not a rewrite of the quotation. |
+| **Job Revision** | `job_revision_id`; job; revision number; complete before/after snapshot; changed fields; Admin; changed time | Append-only record created for every Admin Job save. It preserves the prior working instruction, including commercial and fulfilment values. Factory-relevant changes after release record the selected return checkpoint; delivery-only, due-date and price changes do not reopen production. |
+| **Production Step Definition** | `step_id`; company; label; sequence; active state; version | Company-level broad checkpoints are configurable. Unfinished jobs use the current sequence; historical step events retain their recorded label and position. |
+| **Job Step Event** | job; step reference and snapshot; result; actor; occurred time; reason when required | Append-only completion, skip and rework history. Normal completion needs no note; skip and rework require a reason. |
+| **Handover Event** | job; method; actor; occurred time; optional courier/tracking; unpaid-balance override and reason | Exactly one final Shipped or Collected outcome. Full settlement is normal; only Admin may approve handover with balance after production completion. |
 
 ### Billing
 
 | Entity | Core key fields | Relationships and historical-data rule |
 |---|---|---|
 | **Job Billing Record** | `billing_id`; `job_id`; `customer_contact_id`; `active_invoice_id`; `version`; `cancellation_review_status`; `settlement_reason`; `agreement_note` | One per billed job/customer. Owns settlement across all invoice versions, payments and refunds. Creates no separate bank balance. Cancellation review is not-required, pending or confirmed; confirmation records actor/time in history. |
-| **Invoice** | `invoice_id`; `billing_id`; `invoice_number`; `job_id`; `customer_contact_id`; `issued_at`; `due_date`; `lifecycle_status`; `replaces_invoice_id`; `replacement_reason`; `agreement_note`; `subtotal`; `discount_amount`; `tax_rate`; `tax_amount`; `grand_total`; `job_snapshot` | One active invoice per billing record, with superseded predecessors retained. Lifecycle is active or superseded, separate from derived payment state. Replacement keeps the same job/customer and has its own reviewed commercial snapshot and unique number (FR-7). |
+| **Invoice** | `invoice_id`; `billing_id`; `invoice_number`; `job_id`; `customer_contact_id`; `issued_at`; `due_date`; `required_deposit_amount`; lifecycle/replacement fields; totals; `job_revision_snapshot` | The initial Invoice is issued inside Confirm order. Required deposit is RM0 through the invoice total. A commercial Admin Job edit atomically creates the next Invoice version from the current Job revision; every issued version remains immutable. |
 | **Invoice Line** | `invoice_line_id`; `invoice_id`; `source_job_line_id`; `line_number`; `description`; `quantity`; `unit`; `unit_price`; `line_total` | Belongs to one Invoice. Initial values are copied from the Job; replacement values are reviewed under FR-7.9 and may have a null source_job_line_id. Each issued version remains historical. |
 | **Payment** | `payment_id`; `billing_id`; `invoice_id`; `amount`; `payment_date`; `payment_method`; `payment_method_note`; `status`; `void_reason`; `voided_at` | Immutable receipt attached to the invoice active when recorded and its job billing record. Invoice replacement never reassigns this reference. Effective receipts contribute once to net received. Status is recorded or voided; effective linked refunds prevent payment void (FR-8). |
 | **Refund** | `refund_id`; `billing_id`; `source_payment_id`; `amount`; `refund_date`; `method`; `external_reference_or_cash_note`; `reason`; `status`; `void_reason`; `voided_at` | Immutable confirmed external return of money. Same billing record/customer as source Payment. Multiple refunds may reference one Payment but cannot exceed its effective amount or current refund due. Status is recorded or voided; history records actor and event time. |
 
-### Inventory and history
+### Activity history
 
 | Entity | Core key fields | Relationships and historical-data rule |
 |---|---|---|
-| **Inventory Item** | `inventory_item_id`; `name`; `unit_of_measure`; `custom_unit_label`; `category`; `supplier_contact_id`; `current_balance` | May be linked to one supplier Contact and may have many Stock Movements and BOM Components. Its unit cannot change after Stock Movements exist; `other` requires a custom unit label (FR-9.12–FR-9.14). |
-| **Stock Movement** | `stock_movement_id`; `inventory_item_id`; `movement_type`; `quantity`; `movement_date`; `reason`; `actor_label`; `resulting_balance`; `reversal_of_stock_movement_id` | Many Stock Movements belong to one Inventory Item. Posted movements are not edited or deleted; a correction is represented by a linked reversal or adjustment. v1 allows only manual stock-in, stock-out, adjustment and linked reversal movements; Job completion and BOM editing do not create movements (FR-9.8–FR-9.11, FR-9.17–FR-9.21). |
-| **BOM** | `bom_id`; `name`; `notes` | One BOM has many BOM Components. It describes a finished print item or job item and may be edited in v1 because automatic stock deduction is out of scope. |
-| **BOM Component** | `bom_component_id`; `bom_id`; `inventory_item_id`; `quantity_per_finished_unit`; `unit_of_measure` | Belongs to one BOM and references one Inventory Item. Its quantity must be positive and use the referenced item’s unit of measure (FR-9.15–FR-9.16). |
-| **Activity History** | `activity_history_id`; `subject_type`; `subject_id`; `action`; `changed_information`; `previous_status`; `next_status`; `actor_label`; `occurred_at`; `reason` | Records required activity for Quotations, Jobs, Invoices, Payments, Refunds and cancellation settlement. In v1, `actor_label` is the current in-app role/profile label only; it is not secure identity attribution (FR-5.1–FR-5.4). |
+| **Activity History** | subject; action; previous/next state; actor; occurred time; approved reason; safe changed fields | Records confirmation, release, production, mockup, billing, void/refund and handover events. Real-data history uses server-derived identity; synthetic labels are demonstrations only. |
 
 ### Core relationship summary
 
-- Contact (customer) → many Quotations and Jobs.
-- Quotation → many Quotation Lines; accepted latest revision → zero or one Job.
-- Job → many Job Lines; Job → zero or one Job Billing Record.
+- Company → many reusable Catalogue Options; Contact → optional Customer Price Defaults.
+- Contact (customer) → many Prepared Order Forms, private form links, Quotations and Jobs.
+- Prepared Order Form → many snapshotted options and one private link; sharing freezes the form.
+- Quotation → many grouped items, item/order charges and mockup versions; confirmed Quotation → exactly one Job.
+- Confirm order → one confirmed Quotation, one Job, one Job Billing Record and one initial Invoice atomically.
+- Job → many append-only Job Revisions, step events and zero or one final handover event.
+- Company → one ordered set of active Production Step Definitions.
 - Job Billing Record → many invoice versions, at most one active Invoice.
 - Invoice → many Invoice Lines and original Payment references.
 - Job Billing Record → many Payments and Refunds; Payment → many Refunds.
-- Inventory Item → many Stock Movements and many BOM Components.
-- BOM → many BOM Components.
 - Activity History may reference a Quotation, Job, Invoice, Payment, Refund
   or Job Billing Record through
   `subject_type` and `subject_id`.
 
-The planned document snapshots are intentionally separate from live Contact,
-Quotation, and Job records. This preserves what was agreed, produced, and
-invoiced at the time of each business step.
+The submitted Quotation is the preserved record of what was agreed at
+submission. The Job is the editable working instruction until final handover,
+with append-only Job Revisions preserving every earlier instruction. Each
+issued Invoice is a separate immutable commercial snapshot. This preserves
+what was agreed, what the factory was instructed to make at each revision, and
+what was invoiced at each business step.
 
 ### Core integrity rules
 
 | Rule | Applies to | Design intent |
 |---|---|---|
 | Exact commercial calculations | Quotation, Quotation Line, Job, Invoice, Invoice Line, Payment, Refund | Calculate authoritative money values using decimal-safe arithmetic and the SRS calculation order. Do not use binary floating-point values for authoritative totals (FR-1.10). |
-| Historical snapshots | Quotation, Job, Invoice and their Lines | Preserve accepted quotation values in the Job snapshot and issued Job values in the Invoice snapshot. Later edits or revisions must not rewrite historical Job or Invoice data (FR-2.6–FR-2.8, FR-3.3, FR-7.4–FR-7.5). |
-| Explicit lifecycle changes | Quotation, Job, Payment | Apply only the permitted SRS lifecycle transitions. A cancellation, rework, or payment void requires its stated reason and creates an Activity History entry (FR-2, FR-3, FR-8). |
+| Historical snapshots and working revisions | Quotation, Job Revision and Invoice | Preserve the submitted Quotation and every issued Invoice. Admin may update the current Job before final handover, but each save appends a Job Revision and never rewrites the original quotation, a prior Job Revision, an issued Invoice or completed step event. |
+| Stable shared pricing | Prepared Order Form, Prepared Form Option, Private Form Link | Sharing freezes the displayed options, charge methods and amounts. Catalogue/customer-price edits cannot change that offer. Replacement requires removing the old link and sharing a new form. |
+| Transparent calculation | Prepared Form Option, Quotation Item, Quotation Charge | Calculate each item from the Admin-set base price and selected free/per-piece/per-order/fixed adjustments. Show the breakdown and shipping charge; do not apply an implicit compatibility rule or quantity tier. |
+| Atomic confirmation | Quotation, Job, Job Billing Record, Invoice | Confirm order validates the reviewed quotation and deposit, then confirms the quotation, creates its one Job and issues the initial Invoice in one transaction. A retry cannot duplicate any result. |
+| Atomic commercial Job edit | Job, Job Revision, Job Billing Record, Invoice | A commercial Admin Job save appends the Job Revision, supersedes the current Invoice and issues the next Invoice version in one transaction. It keeps the optional deposit unless it exceeds the new total, in which case it becomes the new total. After release it recalculates balance/readiness but never pauses or reverses production. Existing Payments and Refunds keep their original Invoice references and count once within the same billing record. |
+| Release gates | Job, Invoice, Payment, Mockup | Release requires Admin action, a current mockup and an effective confirmed receipt total meeting the required deposit. RM0 satisfies the financial condition without a receipt. |
+| Explicit lifecycle changes | Quotation, Job, Payment, Job Step Event, Handover Event | Apply only permitted SRS transitions. Required reasons and server-derived actor/time are recorded in history. |
+| Production concurrency | Job, Production Step Definition, Job Step Event | The first valid current-step action wins. Stale competing actions fail without duplicate progress. Workflow edits affect unfinished work but never rewrite completed/skipped history or reopen handed-over jobs. |
+| Handover gate | Job, settlement, Handover Event | Production completion plus full settlement enables normal handover. Only Admin may authorize handover with an unpaid balance and a reason; the balance remains open and visible as Not paid yet. |
 | One active invoice per job | Job Billing Record, Invoice | Unique billing record per job; unique active invoice per billing record. Replacement atomically supersedes the old invoice and creates the new one (FR-7.7–FR-7.13). |
 | Receipt-derived settlement | Job Billing Record, Invoice, Payment, Refund | Sum effective receipts minus effective refunds once across invoice history, compare with active invoice total, and show either amount due or refund due; never sum superseded invoice totals (FR-8.19). |
-| Immutable posted stock history | Inventory Item, Stock Movement | A posted Stock Movement is never edited or deleted. Corrections use a linked reversal or adjustment; each posting must retain its resulting balance (FR-9.8–FR-9.11). |
-| No automatic BOM consumption in v1 | Job, BOM, Inventory Item, Stock Movement | Creating/editing a BOM and completing a Job must not create Stock Movements in v1. Stock changes are manual Ledger postings only (FR-9.10, FR-9.17–FR-9.21). |
 | Activity-history limits | Activity History | Record the current in-app role/profile label, time, action, subject, changed information, and required reason for Quotation, Job, Invoice, Payment, Refund and settlement events. Do not present this v1 record as secure identity attribution (FR-5). |
 
 ### Data representation conventions
@@ -248,9 +393,9 @@ authorize a database schema, migration, or implementation.
 - Store timestamps in UTC and display them using `Asia/Kuala_Lumpur`. Treat
   quotation due dates, invoice due dates, and payment dates as local calendar
   dates.
-- Retain historical issued-document snapshots, Payments, Refunds, posted Stock
-  Movements, and Activity History rather than silently editing or deleting
-  them.
+- Retain historical issued-document snapshots, step events, handover events,
+  Payments, Refunds and Activity History rather than silently editing or
+  deleting them.
 - Apply `company_id` to all business entities, including child lines, history
   and request identities, under the ownership baseline below. It is omitted
   from the repeated core-field lists for readability, not from the design.
@@ -268,28 +413,32 @@ calendar dates use date; versions use positive bigint limited to the JSON-safe i
 numeric(20,2), quantities/deltas numeric(20,3), tax percentage numeric(5,2).
 Apply the tighter API range checks in §5, not just database capacity. Use exact
 arithmetic for aggregates; derived settlement is not independently editable.
-Mutable roots (Quotation Family, Contact, Job, Inventory Item, BOM and Job Billing
-Record) have a version; increment it once per committed aggregate mutation.
+Mutable roots (Catalogue Option, Customer Price Defaults, Prepared Order Form,
+Quotation, Contact, Job, Production Workflow and Job Billing Record) have a
+version; increment it once per committed aggregate mutation.
 
 | Records | Required uniqueness and reference constraints | Transaction-only checks |
 |---|---|---|
-| Quotation Family | Add `family_id`, `latest_revision_id`, `converted_job_id` (nullable), version and company ownership; one latest pointer belongs to its family | Lock family for edit/revise/transition/convert; no change after conversion |
-| Quotation / Lines | Add family_id and unique `(company_id,family_id,revision_number)`; previous revision belongs to same family; unique line_number per revision | New revision becomes latest atomically; complete/valid before sent; accepted latest only converts |
-| Job / Lines | Unique `(company_id,source_quotation_family_id)` and source revision; job and source quote/customer share company | Snapshot and source converted marker/history commit together |
-| Contact | Same-company references; at least phone or email; type customer/supplier; restrict deletion of referenced records | Prevent contact-type change if it would invalidate existing references |
-| Job Billing Record | Unique `(company_id,job_id)`; same-company/customer Job; active invoice pointer belongs to this billing record | Serialize all billing operations on this row; initial creation coordinates with Job lock |
+| Catalogue Option / Customer Price Default | Same-company ownership; price-default references belong to the same customer/company; exact amounts and valid charge methods | Deleting a catalogue option does not cascade into frozen forms or history; creating the same label later creates a new identity |
+| Prepared Order Form / Options | Same-company customer; unique option order within category; valid copied labels, charge methods and amounts | Editable only while draft; sharing freezes the aggregate; removing a shared form invalidates its link and incomplete draft permanently |
+| Private Form Link | Same-company Prepared Order Form/customer; unique token digest; one submission result | Validate shared state, expiry/removal and prior submission atomically; never persist or log the raw token |
+| Quotation / Items | Unique quotation number; unique item order; submitted commercial snapshot immutable | Submit validates pricing and fulfilment; Confirm order locks the quotation and rejects duplicate confirmation |
+| Job / Revisions / Items | Unique `(company_id,source_quotation_id)`; Job and source quotation/customer share company; unique revision number per Job | Confirmed marker, initial Job revision, billing record, Invoice and history commit together. Every later Admin save locks the current Job version and appends exactly one Job Revision. |
+| Contact | Same-company references; display name and usable contact details; restrict deletion of referenced records | Historical snapshots do not change with later contact edits |
+| Production Workflow / Step Events | Unique active sequence positions; step events belong to same-company Job and preserve step label/position | Workflow edits recalculate unfinished work only; step actions lock/version the Job so one current-step action wins |
+| Job Billing Record | Unique `(company_id,job_id)`; same-company/customer Job; active invoice belongs to this billing record | Confirm order creates the initial billing state; all later billing writes serialize on this row |
 | Invoice / Lines | Unique `(company_id,invoice_number)`; partial unique billing_id where lifecycle=active; replacement belongs to same billing record; unique replacement link and line_number | Supersede and replace together; immutable content; current pointer and active invoice agree at commit |
 | Payment / Refund | Composite references enforce company and billing membership; positive amounts; refund source Payment required; valid recorded/voided enums | Aggregate refund/source caps, payment-void protection and dates; one billing lock protects all writes |
-| Inventory Item / Stock Movement | Movement same-company item; unit taken from item; unique non-null reversal_of per company; posted content immutable; numeric delta nonzero | Lock item, reject negative/overflow balance, calculate historical resulting_balance; prohibit reversal of reversal |
-| BOM / Component | Same-company item; positive quantity; unique inventory item per BOM; unit from item | Version check full component replacement; no stock side effect |
+| Handover Event | Unique final event per Job; method matches saved fulfilment method | Require production complete; require full settlement or an Admin-only balance override with reason |
 | Activity / request keys | Same-company subjects; actor from session in real-data mode; request identity unique by company/actor/operation/key | Insert activity and deduplication result with business transaction; sanitize change fields |
 
 Use composite foreign keys/unique keys where ownership must survive incorrect
 application code. Index foreign keys and list access paths: company+createdAt+id,
-jobs company+status+dueDate+id, quotations company+status+createdAt+id, invoices
-billingId+issuedAt+id, movements itemId+createdAt+id, and activity
+jobs company+status+dueDate+id, job revisions jobId+revisionNumber, quotations
+company+status+createdAt+id, invoices billingId+issuedAt+id, step events
+jobId+occurredAt+id, and activity
 company+subjectType+subjectId+occurredAt+id. Do not cascade-delete historical
-invoices, payments, refunds, movements or audit records. Exact migration syntax
+invoices, payments, refunds, step events, handover events or audit records. Exact migration syntax
 and identity foreign keys must be reviewed when backend implementation is assigned.
 
 ## 5. Interface design
@@ -304,27 +453,29 @@ agreement; they do not authorize API implementation.
 
 | Operation | SRS link | Records | Must ensure |
 |---|---|---|---|
-| Create/revise/send/accept/decline quotation (Quotations) | FR-1, FR-2, FR-4 | Quotation, Quotation Line, Activity History | Validate and calculate values. A sent/accepted change creates a linked draft revision and activity entry. |
-| Convert accepted quotation to Job (Quotations + Jobs) | FR-2.3–FR-2.8, FR-3.3 | Quotation, Job, Job Line, Activity History | Verify that the latest family revision is accepted and no family Job exists; create the Job snapshot/lines, mark conversion, and record activity together. |
-| Update Job lifecycle, delivery, or production stage (Jobs) | FR-3, FR-6 | Job, Activity History | Allow only permitted transitions; require cancellation/rework reason where applicable and record activity. |
+| Save and submit priced form | FR-1, FR-2, FR-4 | Form link, Quotation, items, mockup versions, history | Resolve approved pricing, calculate totals, snapshot displayed values and create `submitted`; do not create a Job or Invoice. |
+| Confirm order | FR-2, FR-3, FR-7 | Quotation, Job, billing record, Invoice, history | Admin supplies deposit RM0–total. Confirm quotation, create its single Job and issue the initial Invoice atomically and idempotently. |
+| Edit Job | FR-3, FR-7 | Job, Job Revision, billing record, Invoice, step events, history | Admin only before handover/cancellation. Append a revision; commercial changes replace the current Invoice atomically and retain the optional deposit unless it exceeds the new total. After release, factory-relevant changes require a selected return step and repend that step onward. |
+| Release production | FR-3 | Job, mockup, settlement, history | Admin only; require awaiting-release Job, current mockup and deposit condition. Start the first configured step; payment alone never releases. |
+| Complete, skip or rework current step | FR-3, FR-5 | Job, step event, history | Require the individually granted action and current Job version. Complete is one tap; skip/rework require reason; advance or complete production automatically. |
+| Reopen for rework | FR-3 | Job, step events, history | Admin only before handover; select return step and reason, clear readiness, preserve history and repend that step onward. |
+| Record Shipped or Collected | FR-6 | Job, handover event, history | Require production completion and full settlement, or Admin-only handover-with-balance reason. Courier/tracking are optional for shipping. |
 
 #### Billing and Activity History
 
 | Operation | SRS link | Records | Must ensure |
 |---|---|---|---|
-| Create Invoice for Job (Billing) | FR-7 | Job, Invoice, Invoice Line | Job comes from an accepted quotation, is not cancelled and has no Invoice; create the full Invoice snapshot and lines together, including before production. |
-| Record or void Payment (Billing) | FR-8 | Payment, Invoice, Activity History | Confirm details; prevent overpayment; recalculate balance/status. A void retains its Payment, requires a reason, and records the required activity. |
-| Replace invoice / settle cancellation (Billing) | FR-7.7–FR-7.13, FR-5.4 | Job Billing Record, Invoice/Lines, Activity History | One active invoice, immutable predecessors, same job/customer, reason/agreement confirmation; preserve existing money records. |
+| Issue initial Invoice within Confirm order | FR-7 | Job Billing Record, Invoice, Invoice Item | Use the confirmed quotation/Job snapshot and Admin-set deposit RM0–total; no separate first-invoice request exists. |
+| Record or void Payment | FR-8 | Payment, Invoice, Activity History | Append a confirmed receipt and recalculate settlement. Void retains the Payment and requires a reason. After release, a void never reverses or stops production, but may block normal handover. |
+| Replace invoice / settle cancellation (Billing) | FR-7.7–FR-7.13, FR-5.4 | Job Billing Record, Invoice/Lines, Activity History | One active invoice and immutable predecessors. Commercial Job edits replace it automatically; billing-only corrections require a reason, while cancellation settlement retains its agreement confirmation. Existing money records remain attached. |
 | Record or void Refund (Billing) | FR-8.19–FR-8.27, FR-5.4 | Refund, Payment, Job Billing Record, Activity History | Confirm actual external return; enforce refundable/source caps and dates; preserve original on a reasoned recording correction. |
 | Retrieve Activity History (Audit) | FR-5 | Activity History | Return Quotation, Job, Invoice, Payment, Refund and settlement entries by affected record/time, using the in-app label only—not secure identity attribution. |
 
-#### Contacts and Inventory
+#### Contacts
 
 | Operation | SRS link | Records | Must ensure |
 |---|---|---|---|
-| Manage Contacts (Contacts) | FR-9.1, FR-9.4–FR-9.6 | Contact | Validate a display name and at least one contact method before saving. |
-| Manage Inventory Items and BOMs (Inventory) | FR-9.2, FR-9.7, FR-9.12–FR-9.18 | Inventory Item, BOM, BOM Component | Validate units and positive component quantities. BOM changes do not post stock in v1. |
-| Post manual Stock Movement or correction (Inventory) | FR-9.3, FR-9.8–FR-9.11 | Stock Movement, Inventory Item | Validate item/unit and non-negative balance; use linked reversal/adjustment, never edit/delete. |
+| Manage Contacts | FR-9 | Contact | Validate reusable customer details; changes apply prospectively and never rewrite submitted/issued snapshots. |
 
 These operations describe intended ownership and integrity boundaries only.
 They do not authorize implementing REST endpoints, database transactions or
@@ -338,15 +489,15 @@ Complete each journey's detailed fields and exceptional paths before coding.
 
 | Journey | User interaction | Visible result |
 |---|---|---|
-| Prepare quotation | Open quotation list, create draft, select customer, enter lines and review totals | Saved draft detail or validation errors retaining entered values |
-| Convert quotation | Open accepted quotation, review agreed items and confirm conversion | Linked job with preserved quantities and prices; ineligible revisions cannot convert |
-| Track production | Open job board and job detail; apply an allowed stage/status action | Updated status and required history; cancellation/rework requests a reason |
-| Issue invoice | Open eligible job and deliberately create invoice | Immutable invoice detail showing amount due; a second active invoice is rejected; corrections use linked replacement |
-| Record payment | Open invoice, enter an actual receipt (including a pre-production deposit) and confirm; void a recording mistake through a reasoned action | Separate payment history and recalculated remaining balance; no second invoice or production-status change |
-| Correct invoice / settle cancellation | Open billing detail, compare proposed values with original/job, enter reason and agreement note, then confirm | Linked replacement or unchanged-charge settlement; net receipts retained; amount due/refund due visible |
+| Submit priced order | Customer or Admin opens the private form, chooses configured options/quantities, sees prices and fulfilment cost, optionally attaches mockup and submits | One submitted quotation retaining entered values and displayed prices; no Job or Invoice yet |
+| Confirm order | Admin opens the submitted-order drawer, reviews missing information, sets deposit and confirms once | Quotation confirmed, Job created awaiting release and initial Invoice issued as one result |
+| Release production | Admin resolves displayed deposit/mockup conditions and releases explicitly | Job enters production at the first current configured step |
+| Track production | Granted Staff opens current work and completes one step, or skips/reworks with reason | Actor/time recorded, next step shown automatically; all steps complete production automatically |
+| Record payment | Open the job/order drawer, choose deposit-needed, remaining balance or custom amount, verify prefilled date/method and confirm | Immutable receipt and refreshed deposit, balance and Ready/Not paid yet indicators |
+| Fulfil order | Open completed job drawer and confirm Shipped or Collected; optionally expand shipping details | One handover event with actor/time; unpaid handover appears only as an Admin exception requiring reason |
+| Edit Job / correct invoice | Admin edits the current Job drawer; a billing-only correction remains available in billing detail | A Job edit preserves a revision and updates the current Invoice when commercial values changed; earlier invoices and money records remain readable |
 | Record refund | Open refund-due billing detail, select source receipt, confirm actual return details | Immutable refund/history and recalculated settlement; promise or excessive amount rejected |
 | Manage contacts | Open contact list and edit/create customer or supplier | Validated contact available to its relevant workflow |
-| Maintain inventory | Open item/BOM detail; post stock through a separate manual ledger action | Updated balance explained by movement history; BOM edits do not consume stock |
 
 For each applicable screen, specify loading, empty, validation failure,
 service failure, retry, unsaved changes and duplicate-submit behaviour.
@@ -365,10 +516,10 @@ Planning defaults for the later frontend, subject to walkthrough review:
 | Destination | Main task | Detail/actions |
 |---|---|---|
 | Overview | See workload and amounts outstanding | Summaries link to filtered source lists; no separate dashboard totals logic |
-| Quotations | Find and prepare offers | Draft form, review/detail, revision history and conversion confirmation |
+| Quotations | Review submitted priced forms | Submitted-order drawer with Needs changes and one Confirm order action |
 | Jobs | See what needs production next | Board/list, job detail, stage/status action and relevant history |
 | Billing | Find invoices and balances | Invoice detail, issue preview, payment confirmation and reasoned void |
-| More | Reach supporting records | Contacts, Inventory, BOM and Stock Ledger; role indicator is display-only in the prototype |
+| More | Reach supporting records | Contacts, settings and secondary history; deferred inventory is absent |
 
 These five destinations form mobile bottom navigation, with text labels and
 space reserved below page content. Desktop uses the same destinations in a
@@ -401,14 +552,14 @@ or accept real business data as a shortcut to production persistence.
 
 Fixtures and the later API use the same operation interfaces. Domain state is
 owned by the adapter/server; cached query results are not a second database.
-The adapter must update all affected records together for conversion/payment/
-stock scenarios, including linked history where required. Mock failures and
+The adapter must update all affected records together for Confirm order,
+payment and production scenarios, including linked history where required. Mock failures and
 conflicts must be reproducible for acceptance checks. This design is not yet
 implemented and does not alter the current prototype's actual behaviour.
 
 ### API contract baseline
 
-Design version: 2026-09-09. These contracts are documentation, not implemented
+Design version: 2026-09-23. These contracts are documentation, not implemented
 endpoints. Billing contracts below settle the approved FR-7/FR-8 behaviour;
 other module contracts follow. Business decisions still marked proposed in
 SRS §6 remain gates for their dependent actions.
@@ -453,7 +604,8 @@ SRS §6 remain gates for their dependent actions.
   `UNAUTHENTICATED`; 403 `FORBIDDEN`; 404 `NOT_FOUND` for missing/inaccessible
   record IDs; 409 `STALE_VERSION`, `INVALID_TRANSITION`, `IDEMPOTENCY_CONFLICT`,
   `REQUEST_IN_PROGRESS`, `ACTIVE_INVOICE_EXISTS`, `PAYMENT_HAS_REFUNDS`,
-  `AMOUNT_EXCEEDS_DUE`, `AMOUNT_EXCEEDS_REFUNDABLE`, `NEGATIVE_STOCK`, `REVISION_NOT_LATEST`, `FAMILY_ALREADY_CONVERTED`, `RECORD_ALREADY_VOIDED`; 422 `VALIDATION_FAILED`;
+  `AMOUNT_EXCEEDS_DUE`, `AMOUNT_EXCEEDS_REFUNDABLE`, `ORDER_ALREADY_CONFIRMED`,
+  `RELEASE_CONDITIONS_UNMET`, `STEP_NOT_CURRENT`, `RECORD_ALREADY_VOIDED`; 422 `VALIDATION_FAILED`;
   429 `RATE_LIMITED` with Retry-After; 503 `TEMPORARY_FAILURE`. Do not reveal
   another company's existence, payload, stack trace or key lookup result.
 
@@ -471,7 +623,7 @@ type InvoiceLineInput = {
 };
 type InvoiceTerms = {
   billingName: string; billingAddress: string | null;
-  dueDate: Date; lines: InvoiceLineInput[];
+  dueDate: Date; requiredDepositAmount: Money; lines: InvoiceLineInput[];
   discountAmount: Money; taxRate: string; notes: string;
 };
 type SettlementView = {
@@ -510,19 +662,20 @@ type BillingResult = {
 ```
 
 Billing address length is 0–1000 characters when non-null. Initial invoice
-terms are derived from the agreed Job snapshot, never client-submitted totals.
+terms are created inside Confirm order from the confirmed quotation and Job
+snapshot, never client-submitted totals. Required deposit may be RM0 through
+the invoice total.
 Replacement billing display name/address may change but customerId cannot.
 Replacement dueDate cannot precede replacement issue date. Currency is MYR;
 no foreign-currency input or conversion is implied.
 
 | Method and path | JSON input / query | Success body / rule |
 |---|---|---|
-| POST `/jobs/{jobId}/billing` | `{expectedVersion:number,dueDate:Date}`; version refers to Job | 201 BillingResult; create first billing record and active invoice from job snapshot. Require eligible non-cancelled job; reject existing billing record |
 | GET `/jobs/{jobId}/billing` | No body | BillingView; 404 if none exists |
 | GET `/billing-records/{id}` | No body | BillingView |
 | GET `/billing-records/{id}/invoices` | Common pagination | List of InvoiceView; includes superseded versions |
 | GET `/billing-records/{id}/invoices/{invoiceId}` | No body | InvoiceView; both IDs must belong together |
-| POST `/billing-records/{id}/replacements` | `{expectedVersion:number,terms:InvoiceTerms,reason:string,agreementNote:string}` | 201 BillingResult; same job/customer, new number; cancelled job must use settlement route |
+| POST `/billing-records/{id}/replacements` | `{expectedVersion:number,terms:InvoiceTerms,reason:string}` | 201 BillingResult; billing-only correction, same job/customer and new number; cancelled job must use settlement route |
 | POST `/billing-records/{id}/cancellation-settlements` | `{expectedVersion:number,reason:string,agreementNote:string,replacementTerms:InvoiceTerms|null}` | 200 BillingResult; job must be cancelled. Null confirms unchanged active charge; terms create replacement and confirm charge atomically. changedRecord ID is billing ID |
 | GET `/billing-records/{id}/payments` | Common pagination | List of PaymentView; recorded and voided entries included |
 | POST `/billing-records/{id}/payments` | `{expectedVersion:number,amount:Money,paymentDate:Date,method:Method,methodNote?:string}` | 201 BillingResult; attach current active invoice; amount >0 and <=amountDue. Date not future; note required for other, 1–200 chars |
@@ -559,7 +712,7 @@ Resulting settlement is activeTotal `200.00`, received `700.00`, refunded
 Version increments to 5. The original payment remains attached to its original
 invoice, even if cancellation created a replacement invoice.
 
-#### Quotation, production and inventory contracts
+#### Quotation and production contracts
 
 These routes use the shared prefix, validation, errors, idempotency and list
 envelope above. DTOs below define the screen data; storage-only keys are not
@@ -572,47 +725,41 @@ type ContactInput = {
   address: string | null; notes: string;
 };
 type ContactView = ContactInput & {id: UUID; version: number; createdAt: Timestamp};
-type DraftLine = {
-  description: string; quantity: Quantity | null; unit: string;
-  unitPrice: Money | null;
+type ChargeMethod = 'free' | 'per_piece' | 'per_order' | 'fixed_item';
+type SelectedOption = {preparedOptionId: UUID};
+type DraftItem = {
+  selections: SelectedOption[];
+  sizeQuantities: {preparedOptionId:UUID; quantity:Quantity}[];
 };
 type QuotationInput = {
-  customerId: UUID | null; dueDate: Date | null; sourceNote: string;
-  lines: DraftLine[]; discountAmount: Money; taxRate: string; notes: string;
+  dueDate: Date | null; sourceNote: string; items: DraftItem[];
+  selectedCharges: {preparedOptionId:UUID; applicableQuantity:Quantity}[];
+  fulfilmentMethod: 'shipping' | 'self_collection'; notes: string;
 };
 type QuotationView = QuotationInput & {
-  id: UUID; familyId: UUID; version: number; revision: number;
-  number: string; previousRevisionId: UUID | null; isLatest: boolean;
-  status: 'draft' | 'sent' | 'accepted' | 'declined' | 'converted_to_job';
+  id: UUID; preparedFormId: UUID; version: number; number: string;
+  status: 'draft' | 'submitted' | 'needs_changes' | 'confirmed' | 'cancelled';
   jobId: UUID | null; createdAt: Timestamp;
-  totals: {subtotal: Money; taxAmount: Money; grandTotal: Money; provisional: boolean};
-  lineTotals: (Money | null)[];
+  totals: {itemsTotal:Money; chargesTotal:Money; shippingCharge:Money;
+    discountAmount:Money; taxAmount:Money; grandTotal:Money; provisional:boolean};
 };
-type JobStatus = 'pending' | 'in_production' | 'ready_for_delivery' | 'delivered' | 'cancelled';
-type Stage = 'preparation' | 'production' | 'quality_check' | 'packing';
+type JobStatus = 'awaiting_release' | 'in_production' | 'production_complete'
+  | 'shipped' | 'collected' | 'cancelled';
+type JobEditInput = {
+  dueDate: Date; fulfilmentMethod: 'shipping' | 'self_collection';
+  fulfilmentDetails: object; items: DraftItem[];
+  selectedCharges: {preparedOptionId:UUID; applicableQuantity:Quantity}[];
+  shippingCharge: Money; productionNotes: string; returnStepId?: UUID;
+};
 type JobView = {
   id: UUID; number: string; version: number; createdAt: Timestamp;
-  status: JobStatus; stage: Stage; dueDate: Date;
-  deliveryStatus: 'not_ready' | 'ready' | 'delivered' | 'not_applicable';
+  status: JobStatus; dueDate: Date;
+  currentStep: {id:UUID; label:string; position:number} | null;
+  fulfilmentState: 'not_ready' | 'not_paid_yet' | 'ready' | 'handed_over';
   lines: {description:string; quantity:Quantity; unit:string}[];
   customer: {id:UUID; displayName:string} | null;
   sourceQuotationId: UUID | null;
 };
-type ItemInput = {
-  name: string; unit: 'unit' | 'sheet' | 'metre' | 'kilogram' | 'roll' | 'other';
-  customUnitLabel: string | null; category: string | null; supplierId: UUID | null;
-};
-type ItemView = ItemInput & {id:UUID; version:number; balance:string; createdAt:Timestamp};
-type MovementView = {
-  id:UUID; itemId:UUID; type:'stock_in' | 'stock_out' | 'adjustment' | 'reversal';
-  delta:string; resultingBalance:string; unit:string; movementDate:Date;
-  reason:string; actorLabel:string; reversalOf:UUID|null; createdAt:Timestamp;
-};
-type BomInput = {
-  name:string; notes:string;
-  components:{itemId:UUID; quantityPerUnit:Quantity}[];
-};
-type BomView = BomInput & {id:UUID; version:number; createdAt:Timestamp};
 ```
 
 Contact phone: 1–40 characters; email: valid address up to 254 characters;
@@ -620,28 +767,18 @@ at least one non-null contact method. Address up to 1000 characters. Changing
 contact type is rejected if it invalidates existing references; archival UI
 is deferred rather than exposing a destructive delete route.
 
-Draft quotation fields may be incomplete: customer/date may be null, source
-and descriptions may be empty, lines may be empty (max 200), and quantity/
-price may be null. Non-null numeric values must still satisfy validation.
-Only rows with description, quantity, price and unit produce a line total;
-others return null. Totals are provisional until all required header/line
-fields are complete. Discount cannot exceed the subtotal of complete rows.
-Sending fails until every row and required header is complete. Due date is
-a recorded requested date, not an automatic scheduling commitment; no automatic
-future-date restriction is inferred for quotations.
+The private form accepts only options copied into its Prepared Order Form.
+Customer input supplies selections and quantities, never authoritative labels,
+prices, charge methods or totals; the server reads those from the frozen form
+and calculates the transparent breakdown. Drafts may be incomplete, but
+submission requires at least one complete item, positive size quantities and
+the approved fulfilment fields. Due date is a requested date, not an automatic
+scheduling commitment.
 
 JobView always omits financial values. Customer is null without contacts.view;
 sourceQuotationId is null without quotations.view. Financial readers use the
 separately authorized quotation/billing endpoints. In synthetic mode these
 permissions are fixture projections, never security claims.
-
-Item name/category follow name length rules; customUnitLabel is required only
-for other, otherwise null. Supplier must be a supplier Contact. Stock balance
-is non-negative with up to three decimals, maximum `999999999999.999`.
-Movement dates cannot be future; recorded order is createdAt/ID, not a
-backdated movement date, so historical resulting balances never rearrange.
-BOMs have 1–200 unique item components with positive quantities; units are
-derived from items. No automatic consumption is implied.
 
 | Method and path | JSON input / query | Success / condition |
 |---|---|---|
@@ -649,76 +786,77 @@ derived from items. No automatic consumption is implied.
 | GET `/contacts/{id}` | None | ContactView |
 | POST `/contacts` | ContactInput | 201 ContactView, version 1 |
 | PUT `/contacts/{id}` | `{expectedVersion:number,contact:ContactInput}` | 200 ContactView; full replacement of editable fields |
-| GET `/quotations` | Pagination, optional `status`, `q` (display number) | List QuotationView of latest family revisions only |
-| GET `/quotations/{id}` | None | QuotationView of requested revision |
-| GET `/quotations/{id}/revisions` | Pagination | List QuotationView in the same family |
-| POST `/quotations` | QuotationInput | 201 QuotationView; new family, draft revision 1, version 1 |
-| PUT `/quotations/{id}` | `{expectedVersion:number,quotation:QuotationInput}` | 200 QuotationView; family version; latest draft only |
-| POST `/quotations/{id}/transitions` | `{expectedVersion:number,action:'send'|'accept'|'decline'}` | 200 QuotationView; latest revision and legal source state only |
-| POST `/quotations/{id}/revisions` | `{expectedVersion:number}` | 201 copied draft QuotationView; latest sent/accepted/declined revision only, no converted family |
-| POST `/quotations/{id}/conversion` | `{expectedVersion:number}` | 201 `{quotation:QuotationView,job:JobView}`; accepted latest only; one job per family |
+| POST `/catalogue-options` | category, label and optional default charge metadata | 201 reusable option; Admin only |
+| PUT `/catalogue-options/{id}` | expected version and replacement values | 200 option for future form preparation; frozen forms unchanged |
+| DELETE `/catalogue-options/{id}` | expected version | 204; remove from future preparation; frozen forms/history unchanged |
+| POST `/prepared-forms` | customer, selected/copied options, Admin-set prices, optional operational-field initial values and expiry | 201 editable draft prepared form |
+| POST `/prepared-forms/{id}/share` | expected version | 201 frozen prepared form and private link |
+| DELETE `/prepared-forms/{id}` | expected version | 204 for a draft or unsubmitted shared form; permanently remove access and discard incomplete input. Reject after submission; historical quotation remains |
+| GET `/quotations` | Pagination, optional `status`, `q` | List QuotationView |
+| GET `/quotations/{id}` | None | QuotationView |
+| PUT `/form-links/{token}/draft` | QuotationInput | Save a private-form draft within the bound customer/pricing scope |
+| POST `/form-links/{token}/submit` | `{expectedVersion:number}` | 201 submitted QuotationView; no Job or Invoice side effect |
+| POST `/quotations/{id}/needs-changes` | `{expectedVersion:number,note:string}` | 200 QuotationView; keep correction in the review journey |
+| POST `/quotations/{id}/confirm-order` | `{expectedVersion:number,requiredDepositAmount:Money,dueDate:Date}` | 201 quotation, Job, billing record and initial Invoice atomically; deposit may be `0.00` through total |
 | GET `/jobs` | Pagination, optional `status`, `q` (job number), `dueFrom`, `dueTo` | List JobView; dueFrom <= dueTo |
 | GET `/jobs/{id}` | None | JobView |
-| POST `/jobs/{id}/transitions` | `{expectedVersion:number,action:'start'|'ready'|'deliver'|'cancel',reason?:string}` | 200 JobView; cancel requires reason; rules below |
-| POST `/jobs/{id}/stage` | `{expectedVersion:number,target:Stage,reason?:string}` | 200 JobView; in-production only; backward movement requires reason; same stage rejected |
-| GET `/inventory/items` | Pagination, optional `q` (name) | List ItemView |
-| GET `/inventory/items/{id}` | None | ItemView |
-| POST `/inventory/items` | ItemInput | 201 ItemView with zero balance, version 1 |
-| PUT `/inventory/items/{id}` | `{expectedVersion:number,item:ItemInput}` | 200 ItemView; cannot change unit/customUnitLabel after any movement |
-| GET `/inventory/items/{id}/movements` | Pagination | List MovementView |
-| POST `/inventory/items/{id}/movements` | `{expectedVersion:number,type:'stock_in'|'stock_out'|'adjustment',quantity:string,movementDate:Date,reason:string}` | 201 `{item:ItemView,movement:MovementView}`; in/out quantity positive, adjustment signed nonzero; derive delta |
-| POST `/inventory/items/{id}/movements/{movementId}/reversal` | `{expectedVersion:number,movementDate:Date,reason:string}` | 201 `{item:ItemView,movement:MovementView}`; negate full original delta once, no reversal of reversal |
-| GET `/inventory/boms` | Pagination, optional `q` (name) | List BomView |
-| GET `/inventory/boms/{id}` | None | BomView |
-| POST `/inventory/boms` | BomInput | 201 BomView, version 1 |
-| PUT `/inventory/boms/{id}` | `{expectedVersion:number,bom:BomInput}` | 200 BomView; full component replacement; no stock change |
+| PUT `/jobs/{id}` | `{expectedVersion:number,job:JobEditInput}` | 200 JobView and current billing summary. Admin only while not shipped, collected or cancelled. A released factory-relevant change requires `returnStepId`; a commercial change atomically returns the replacement Invoice and caps any optional deposit at the revised total. |
+| POST `/jobs/{id}/release` | `{expectedVersion:number}` | 200 JobView; Admin only; current mockup and deposit conditions required |
+| POST `/jobs/{id}/steps/{stepId}/complete` | `{expectedVersion:number}` | 200 JobView; permitted current-step action; actor/time server-owned |
+| POST `/jobs/{id}/steps/{stepId}/skip` | `{expectedVersion:number,reason:string}` | 200 JobView; permitted current-step action |
+| POST `/jobs/{id}/steps/{stepId}/rework` | `{expectedVersion:number,reason:string}` | 200 JobView; permitted production action |
+| POST `/jobs/{id}/reopen-for-rework` | `{expectedVersion:number,returnStepId:UUID,reason:string}` | 200 JobView; Admin only before handover |
+| POST `/jobs/{id}/handover` | `{expectedVersion:number,method:'shipped'|'collected',courier?:string,trackingReference?:string,allowBalance?:boolean,balanceReason?:string}` | 200 JobView; settled normally; balance exception Admin-only with reason |
 
 Quotation and Job history endpoints are GET `/quotations/{id}/activity` and
 `/jobs/{id}/activity`, using the shared history shape and pagination; quotation
-history covers its family. Job history excludes billing payloads; billing
+history covers its review events. Job history excludes billing payloads; billing
 history requires billing.view. Read routes require domain view permission;
 mutation permissions are mapped below. There are no generic delete endpoints
-for documents, money or stock history.
+for documents, money or production history.
 
 #### Workflow transition tables
 
 | Aggregate/action | Required state | Result / side effect |
 |---|---|---|
-| Quotation send | Latest complete draft, unconverted family | sent; record external-event label only |
-| Quotation accept/decline | Latest sent, unconverted family | accepted or declined; no invoice/job/payment |
-| Quotation revise | Latest sent/accepted/declined, unconverted family | New latest draft; original content/status remains historical |
-| Quotation convert | Latest accepted, family has no job | converted_to_job plus pending/preparation Job and snapshots/history atomically |
-| Job start | pending | in_production; retain preparation stage |
-| Job change stage | in_production | Target stage; backward requires reason. Forward skips are allowed; packing is still required before ready |
-| Job ready | in_production and packing | ready_for_delivery; no stock/invoice/payment action |
-| Job deliver | ready_for_delivery | delivered; no payment gate |
-| Job cancel | pending or in_production, reason required | cancelled, delivery not_applicable; retain stage; existing billing review becomes pending |
-| Stock reversal | Original same-item non-reversal, not previously reversed | New negating movement; reject negative balance; item balance/version update atomically |
+| Submit priced form | Complete valid draft and active private link | `submitted`; snapshot visible prices/options; no Job or Invoice |
+| Request changes | Submitted quotation | `needs_changes`; retain review history and allow corrected resubmission |
+| Confirm order | Submitted quotation; Admin-selected deposit RM0–total | `confirmed`; create awaiting-release Job, billing record and initial Invoice atomically |
+| Edit Job | Admin; Job not shipped, collected or cancelled; current version | Append Job Revision and history. Commercial change atomically replaces current Invoice and caps any optional deposit at the revised total. After release, a factory-relevant change requires selected return step, repends it onward and reopens production when necessary. |
+| Release | Awaiting-release Job; current mockup; deposit condition met | `in_production` at first configured step; Admin action required |
+| Complete current step | In production; permitted current-step action | Append actor/time event and advance; final step makes `production_complete` |
+| Skip current step | In production; permitted current-step action; reason | Append reasoned event and advance like completion |
+| Rework current step | In production; permitted action; reason | Append reasoned rework event and keep/return work to the applicable current step |
+| Reopen for rework | Production complete, not handed over; Admin; return step and reason | `in_production`; clear readiness and repend selected step onward |
+| Workflow edited | Unfinished Job | Reconcile remaining steps to company sequence; preserve completed/skipped history; added work may reopen production-complete Job |
+| Record Shipped/Collected | Production complete and fully settled | Final handover state and event |
+| Allow handover with balance | Production complete, unpaid; Admin; reason | Final handover state; balance remains open and shown Not paid yet |
 
-No stage action reopens ready/delivered/cancelled jobs. Forward skips are an
-implementation baseline consistent with the selected stage model, not a proof
-that intermediate physical checks occurred; enforcing each intermediate stage
-would require a separate approved rule.
+Shipped and Collected jobs are closed. A payment void after release recalculates
+settlement and readiness but never reverses or pauses physical production.
 
 #### Future permission operation map (D5)
 
 Admin can perform authorized business operations within their company, but
 cannot bypass immutable-history rules. Staff receive no grants initially;
 Admin assigns each action individually. Write operations also require the
-corresponding view grant. Suggested display groupings View/Add/Edit/Delete
-must map to these explicit capabilities, not a catch-all delete privilege.
+corresponding view grant. The design uses explicit business actions rather
+than generic CRUD groupings.
 
 | Area | View grant | Separate write grants |
 |---|---|---|
 | Contacts | contacts.view | contacts.create, contacts.update |
-| Quotations | quotations.view | quotations.create, quotations.update, quotations.record_decision, quotations.revise, quotations.convert |
-| Jobs | jobs.view | jobs.start, jobs.change_stage, jobs.ready, jobs.deliver, jobs.cancel |
-| Billing | billing.view | billing.issue, billing.replace, billing.settle_cancellation, billing.record_payment, billing.void_payment, billing.record_refund, billing.void_refund |
-| Inventory | inventory.view | inventory.create, inventory.update, inventory.post_movement, inventory.reverse_movement, inventory.manage_bom |
+| Quotations | quotations.view | quotations.prepare_form, quotations.request_changes, quotations.confirm_order, quotations.cancel |
+| Production | production.view_current | production.attach_mockup, production.complete_step, production.skip_step, production.rework_step, production.manage_workflow |
+| Fulfilment | fulfilment.view_ready | fulfilment.ship, fulfilment.collect |
+| Billing | billing.view | billing.replace, billing.settle_cancellation, billing.record_payment, billing.void_payment, billing.record_refund, billing.void_refund |
 
-Grant administration itself is Admin-only in the planned real-data system;
-Staff cannot grant themselves actions. A quotation creation/update needs
-contacts.view to select a customer; an inventory supplier selector likewise.
+Grant and Staff-account administration are Admin-only in the planned real-data
+system; Staff cannot create accounts or grant themselves actions. These
+administration actions are independent of quotation, invoice, payment and job
+workflows. Admin-only release, reopen-for-rework and allow-handover-with-balance
+remain role checks rather than Staff-grantable actions. Preparing a private form
+needs contacts.view to select a customer.
 Cross-module reads require their own grants. Permissions are server checked
 on direct requests; frontend visibility is only a convenience. Actual login,
 membership/grant endpoints and session settings remain a later security task.
@@ -732,12 +870,12 @@ integrated. Server-only invariants require backend tests as well.
 | Check | Expected evidence | Requirement / dependency |
 |---|---|---|
 | AT-01 Quotation totals | Worked example gives RM1,700.00; discount/tax rounding and invalid bounds covered; failed save retains input | FR-1, FR-4; validation policy |
-| AT-02 Revision/conversion | Reject declined/stale/ineligible revisions; one intended conversion retains both 50-item lines; retry does not duplicate job | FR-2, FR-3, FR-5; D1 |
-| AT-03 Job lifecycle | Allowed transitions succeed, illegal transitions fail; reason required for cancellation/rework; delivery view consistent; no automatic invoice/stock | FR-3, FR-5, FR-6; D2 |
-| AT-04 Invoice/payment | Pending job invoices once; RM700 pre-production deposit + RM1,000 later receipt settles RM1,700 on the same invoice; promised deposits do not count; void recalculates; reject non-positive amounts, overpayment and duplicate effects; cancellation preserves receipts | FR-7, FR-8, FR-5; D3 |
+| AT-02 Submit/confirm | Submission creates only one submitted quotation; Confirm order with deposit RM0–total creates one confirmed quotation, awaiting-release Job and initial Invoice atomically; retry duplicates nothing | FR-1, FR-2, FR-3, FR-7 |
+| AT-03 Production lifecycle | Release rejects missing mockup/unmet positive deposit but accepts RM0 without receipt; one-tap current-step completion wins concurrent attempts; workflow edits preserve history; rework and handover rules hold | FR-3, FR-5, FR-6 |
+| AT-04 Invoice/payment | Initial Invoice exists from Confirm order; RM700 deposit + RM1,000 later receipt settles RM1,700 on the same billing record; void recalculates without reversing released production; reject invalid or duplicate effects | FR-7, FR-8, FR-5 |
 | AT-04a Correction/settlement | No-receipt correction preserves original; with RM700 received, corrected RM1,500 leaves RM800 due, corrected RM500 leaves RM200 refund due; cancellation charge RM200 leaves RM500 refund due; zero charge yields full refund | FR-7.7–FR-7.13, FR-8.19, FR-5.4 |
 | AT-04b Refund integrity | Confirmed external refunds reduce refund due; reject wrong source/date, excess and duplicate effects; block source payment void with effective refunds; refund-record void restores the correct balance; concurrent replacements/refunds preserve constraints | FR-8.20–FR-8.27, SEC-5/SEC-6 |
-| AT-05 Contacts/inventory | Required contact fields, item units and BOM quantities validated; 150 minus 100 leaves 50; correction retains original; concurrent writes cannot make stock negative | FR-9; D4 |
+| AT-05 Contacts/form link | Customer-bound private link uses the correct pricing context, expires/revokes safely, and later contact edits do not rewrite submitted or issued snapshots | FR-1, FR-9, NFR-4 |
 | AT-06 Responsive recovery | All journeys usable on mobile/tablet/desktop and keyboard, with loading/empty/failure/unsaved states; demo reset disclosed | FR-10, FR-11, NFR-1, NFR-2; §5 screen design |
 | AT-07 Boundaries/contracts | Domain tests run without UI; mock and server match the agreed contract; entry points contain composition rather than feature rules | NFR-3; §2 and §5 |
 | AT-08 Real-data security | Direct unauthorized/tampered requests fail; session revocation, ownership, logging and duplicate/concurrent writes tested; backup restored | SEC-1–SEC-7; D5 and backend design decisions |
@@ -745,10 +883,12 @@ integrated. Server-only invariants require backend tests as well.
 ### Deposit, correction, refund and cancellation design
 
 The Billing module owns one Job Billing Record per invoiced job/customer.
-Initial invoicing snapshots the accepted job. Corrections create a reviewed
-replacement with a new number, preserving the original and its receipt links.
-The replacement may correct billing display details, lines and commercial
-values under FR-7.9, but never customer identity or the historical Job snapshot.
+Initial invoicing occurs atomically inside Confirm order and snapshots the
+confirmed quotation and initial Job revision. A commercial Job edit creates a
+new current Invoice version automatically, preserving the original and its
+receipt links. A billing-only correction remains a reviewed replacement with a
+reason. Neither path changes customer identity, the historical quotation or an
+earlier Job revision.
 Payment history does not block a correction: it remains in the same billing
 record and is applied exactly once to the current total.
 
@@ -779,14 +919,15 @@ do not present every historical invoice as a separate outstanding debt.
 
 | Operation | Transaction and interface requirements |
 |---|---|
-| Replace invoice | Accept billing ID, expected version, corrected values, reason/agreement note and request identity. Authorize, lock billing record, validate changes (use settlement flow for cancelled jobs), supersede original, create numbered replacement/lines, update active pointer and record history together. Return new invoice and settlement; never move original payments. |
+| Edit Job with commercial change | Accept Job ID, expected version, current Job values, conditional return step and request identity. Admin only; lock Job and billing record, append Job Revision, recalculate prices, supersede current Invoice, create its numbered replacement/lines, cap the optional deposit at the revised total, update the active pointer and record history together. Return Job, current Invoice and settlement; never move original payments. |
+| Replace invoice | Accept billing ID, expected version, corrected values, reason and request identity. Authorize, lock billing record, validate billing-only changes (use settlement flow for cancelled jobs), supersede original, create numbered replacement/lines, update active pointer and record history together. Return new invoice and settlement; never move original payments. |
 | Settle cancellation | Accept expected version, confirmed charge/lines and agreement note. Job must be cancelled. Lock billing record; retain active invoice if charge is unchanged, otherwise replace it atomically. Record confirmation/history and clear pending review. No automatic refund. |
 | Record refund | Accept source Payment, positive amount, actual date/method/reference, reason, version and request identity. Lock billing record and validate source membership/status, refund due and source cap. Insert refund and history together; return settlement. No external money-transfer call. |
 | Void payment/refund record | Accept record ID, expected version, reason and request identity. Reject repeated void, wrong billing record or Payment with effective linked refunds. Retain original and record history; recalculate settlement. This corrects a recording mistake, not a real transfer. |
 
 All billing mutations serialize on the same Job Billing Record and increment
-its version. Initial invoice creation uses unique job-to-billing ownership to
-handle concurrent first requests. Job cancellation and its pending billing
+its version. Confirm order uses unique quotation-to-Job and Job-to-billing
+ownership to handle concurrent requests. Job cancellation and its pending billing
 review flag update atomically; lock ordering must be consistent with invoice
 issue so a cancellation race cannot bypass eligibility. If settlement is
 changed later, record another explicit reviewed event; never silently edit
@@ -861,12 +1002,10 @@ remains deferred.
   rate-limit values, recovery targets, deployment boundaries and migration
   review. These do not prevent a synthetic-data frontend task after its
   implementation scope is authorized.
-- **Decided 2026-09-02:** Identity/Roles stays a frontend-only display
-  concern for v1 (no backend module), matching FR-10 — enforcement is not
-  required for v1 per `docs/SRS.md` § 2 item 10. The planned module table in
-  §3 records the required frontend display. Server enforcement is excluded
-  from the prototype, but must be designed and verified for a real-data
-  release under SRS NFR-4.
+- The synthetic prototype may display projected Admin/Staff views without
+  claiming secure authorization. Before real data, Admin-managed Staff accounts,
+  default-no-grant behavior and server-enforced business-action grants require
+  a separately approved identity/session design and implementation.
 - Cross-cutting acceptance checks are documented in SRS § 4. Full traceability
   links from requirements through planned operations, transactions, and final
   acceptance tests must be completed per journey before its implementation.
