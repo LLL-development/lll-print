@@ -2,111 +2,164 @@
 
 Project: LLL Print
 Status: Draft
-Last updated: 2026-09-09
+Last updated: 2026-09-21
 
 ## 1. Introduction
 
 ### 1.1 Project Overview
 
-LLL Print is an original, independent web product for Malaysian
-print-shop operations. It provides one responsive operational workspace,
-usable across office desktop, supervisor tablet, and factory-floor
-mobile contexts, to replace manual, chat-based order handling with a
-structured quotation and job-tracking workflow. Full product context,
-scope, and requirements are detailed in `docs/SRS.md`.
+LLL Print is an original, independent web product for Malaysian print-shop
+operations. Its purpose is to reduce repeated manual entry by capturing an
+order once and carrying its details through quotation, invoicing, production
+and fulfilment. Customers and Admin use a priced order form; operational staff
+use the resulting records to coordinate the work.
 
-The product centres on three everyday questions: what did the customer agree
-to, what needs producing next, and what is still unpaid? Its intended value is
-clear handoffs, dependable quantities and money, and usable production views
-on a phone. This is a product direction to validate, not a measured claim of
-speed or superiority.
+Design discussion and customer agreement take place outside the application.
+Once the design is agreed, the customer or Admin enters the clothing choices,
+quantities and customer details, and attaches the mockup. The system generates
+a quotation from that information. Admin sets an order-specific deposit from
+RM0 up to the invoice total, then clicks Confirm order once to confirm the
+quotation, create the job and issue the invoice. Once the deposit and mockup
+conditions are met, Admin may release the job for production. The remaining balance is
+confirmed before shipping or customer collection.
+
+The intended journey is:
+
+Design agreed externally → priced form and mockup → generated quotation →
+Admin-issued invoice and deposit requirement → requirement met → Admin release to factory → factory
+production and completion → confirmed remaining payment → shipping or
+self-collection.
+
+For avoidance of doubt, the approved sequence is: design agreed externally;
+priced form and mockup; submitted quotation; Admin sets the deposit; one
+Confirm order action creates the Job and initial Invoice; the Job awaits
+release until the deposit and mockup conditions are met; Admin releases it;
+configured production steps run; production completion plus full settlement
+normally enables Shipped or Collected, while Admin may approve a reasoned
+handover with a visible unpaid balance. This statement supersedes the older abbreviated
+journey line immediately above.
+
+The linked production job remains the record of what must be made. Submission
+does not itself confirm the quotation, create a job, issue an invoice or start
+production.
+Reusing information must preserve historical agreements and issued documents.
+The intended benefit is fewer repeated entries and clearer handoffs; no
+measured time saving or error reduction is claimed.
 
 Read the three documents in this order:
 
 | Document | Question it answers |
 |---|---|
-| SPMP | What are we doing now, and what comes next? |
+| SPMP | Why are we building the product, what is its scope, and how is the work planned? |
 | SRS | Who uses the system, how does an order move through it, and what must happen? |
-| SDD | How will the code, data and security responsibilities support those requirements? |
+| SDD | How will the UI/UX, architecture, database and interfaces meet those requirements? |
+
+This introduction records the direction agreed on 2026-09-21. Sections 2–3
+and the SRS/SDD remain subject to coordinated review; their older scope and
+implementation-status statements must not be read as an updated baseline.
 
 ### 1.2 Problem Statement
 
-**Ideal situation:** A print shop can take an order, turn it into an
-accurate quotation in minutes, track its production stage in one place,
-and let staff see all current orders and their status without digging
-through chat history.
+**Ideal situation:** After agreeing the design, the customer or Admin records
+the order details once. The customer sees the price, and the shop reuses the
+same information to prepare documents, collect payment, produce and ship.
 
-**Current gaps:** Today, orders are received and negotiated entirely
-through informal chat (e.g. WhatsApp) — a customer describes the order,
-quantity, and sizes in conversation, and staff manually re-write that
-conversation into a quotation and job description by hand.
+**Current gaps:** The described shop process starts with design discussion
+outside the application, followed by confirmation of clothing type and
+quantity. Staff must bring those details into the operational workflow.
+Repeatedly copying customer details, selections and the mockup between steps
+adds manual work and makes it harder to keep the order consistent.
 
-**Consequences:** This manual re-entry is slow and error-prone — wrong
-quantity, size, or price mistakes happen because staff retype from memory
-or chat instead of entering structured data. It also gives no way to
-trace a quote back to the conversation it came from, and no shared view
-of all current orders and their status.
+**Consequences:** Re-entry creates opportunities for mismatched quantities,
+clothing selections, prices or design references. Staff also need a clear
+distinction between work awaiting a deposit, work in production and completed
+work awaiting the remaining payment before shipping. The frequency and cost
+of these problems have not been measured.
 
 ### 1.3 Problem Solution
 
-Candidate approaches considered:
+The agreed approach is one connected order workflow:
 
-- A structured quotation form that replaces free-text chat re-entry with
-  itemized, priced line items.
-- A shared job-tracking board so all current orders and their stage are
-  visible in one place instead of scattered across chat threads.
-- A source-of-enquiry field so a quote can always be traced back to the
-  conversation it came from.
+- Allow the customer to complete a priced form, or Admin to enter the order
+  on the customer's behalf, using the same order information and pricing rules.
+- Include the mockup as a reference to the design already agreed outside the
+  app. Do not add a separate in-app design-approval workflow.
+- Generate the quotation from the submitted details and reuse those details
+  in the linked invoice and production job, avoiding repeated entry.
+- Show production progress and payment information clearly. Admin sets each
+  order's deposit from RM0 up to the invoice total. A zero deposit needs no
+  receipt; a positive deposit must be confirmed. Meeting the requirement makes
+  the job eligible for Admin release, but never starts production automatically.
+  Full settlement normally precedes shipping or customer collection; Admin may
+  approve the controlled unpaid-handover exception with a required reason.
+- Retain document and activity history. An enquiry-source note may provide a
+  manual reference, but does not capture or guarantee access to a conversation.
 
-The confirmed direction (structured quotation + job-tracking workspace)
-is detailed as functional requirements in `docs/SRS.md`.
+Form fields, price calculation and the exact handoffs will be specified in
+the SRS, then translated into UI, architecture and data design in the SDD.
 
 ### 1.4 Objectives
 
-1. To analyze current print-shop order-intake and job-tracking workflows
-   and the gaps caused by manual, chat-based handling.
-2. To design a responsive quotation and job-tracking workspace usable
-   across desktop, tablet, and mobile contexts.
-3. To develop a frontend foundation demonstrating that workspace against
-   the confirmed v1 scope.
+1. To analyze the journey from agreed design to shipping and identify where
+   repeated entry or unclear handoffs cause difficulty.
+2. To design a responsive order-entry and operational workflow whose screens,
+   architecture and database reuse consistent order information.
+3. To develop and verify that workflow in separately approved stages, starting
+   from reviewed requirements and assessing the existing prototype against them.
 
 ### 1.5 Scopes
 
 #### 1.5.1 Scope of the System
 
-**In scope (v1):** Quotation form with explicit status lifecycle, job
-tracking board, source-of-enquiry note, basic activity/audit log, visible
-delivery status, manual invoice creation, confirmed payment marking,
-Contacts/Inventory & BOM/Stock Ledger, basic role display, mobile
-navigation fix, and responsive desktop/tablet/mobile support. Full list
-with detail: `docs/SRS.md` § 2.
+**Agreed product direction for planning:**
 
-Billing planning now includes a manually issued full invoice after job
-creation and confirmed deposits received before production. The remaining
-balance stays in the same job billing record. The planning scope expanded on
-2026-09-09 to include controlled invoice replacement, manually confirmed
-refund records and cancellation settlement (SRS FR-7/FR-8). Original invoices,
-receipts and refunds remain traceable. Actual transfers, formal credit notes
-and automatic payment collection remain excluded; implementation is still
-not authorized by this documentation task.
+- One priced order form completed by the customer or Admin after external
+  design agreement, with mockup attachment by either party.
+- Quotation generation from entered order information, with document status
+  and history; one Admin Confirm order action creates the linked job and
+  initial invoice after the Admin sets the deposit.
+- Linked production jobs reusing customer details, clothing selections,
+  quantities and the mockup. Admin releases eligible jobs to factory Staff,
+  who update production progress and completion in the same system.
+- Order-specific deposit requirements and remaining-payment records, with production and
+  fulfilment gates; shipping and self-collection; Contacts and relevant
+  activity history.
+- Responsive use across customer devices, office desktop, supervisor tablet
+  and factory-floor mobile.
+
+Existing planning for controlled invoice replacement, confirmed refund
+records and cancellation settlement remains for review in SRS FR-7/FR-8;
+this intake change does not remove historical records or authorize automatic
+money transfers. Stock management is not part of this order-entry scope.
+
+**Open decisions:** Exact catalogue option rules, quantity pricing and
+additional charges; quotation output and detailed change/cancellation handling;
+attachment file limits/storage and detailed fulfilment charges. Deposit is not a fixed
+percentage: Admin sets it per order from RM0 up to the invoice total.
 
 **Out of scope (deferred):** Customer-facing QR order/production status
 tracking, AI-assisted features, a full accounting suite, enforced
 multi-staff permissions, WhatsApp/payment-gateway integrations, platform
-administration/multi-company management, and camera-based scanning. Full
-list: `docs/SRS.md` § 3.
+administration/multi-company management, camera-based scanning, and
+Inventory, BOM and Stock Ledger. Full
+list: `docs/SRS.md` section 3.
 
-Production backend APIs/services, databases, production authentication,
-infrastructure/deployment operations, and real file storage are also out
-of scope for the current phase (see § 3.1 below).
+Design creation, design discussions and design approval remain outside the
+application. Recording the agreed mockup does not introduce a design editor
+or approval module. Customer form entry does not imply a customer account or
+customer-facing tracking portal.
 
-**Planning boundary clarified 2026-09-08:** Current work is planning and
-documentation only. Existing frontend code is a prototype to inspect, not
-evidence that the planned workflows are complete. In these documents, **v1**
-means the agreed frontend demonstration scope. A **real-data release** is a
-later delivery stage requiring persistent storage, authentication,
-server-enforced permissions and security verification. Deferring those
-implementations does not make them optional for real business use.
+**Existing prototype versus intended system:** The existing frontend is a
+synthetic-data prototype, not the completed customer-intake and payment-gated
+workflow described here. Older references to **v1** describe the frontend
+demonstration; this expanded direction has not yet been assigned a release.
+
+**Current work:** Review and revise the planning documents. Architecture,
+database, customer access and attachment storage may be designed, but their
+implementation, backend services, authentication, dependencies and deployment
+require separately assigned work. A real-data release needs persistent
+storage, appropriate access controls and verification; the prototype does
+not establish those capabilities.
 
 #### 1.5.2 Coverage of the System
 
@@ -114,38 +167,49 @@ implementations does not make them optional for real business use.
   operations).
 - **Language of the system:** English (`en-MY` locale), with MYR currency
   and `Asia/Kuala_Lumpur` timezone as defaults.
-- **Users of the system:** Admin, Staff (operational workspace users,
-  visually distinct in v1, not permission-enforced); Customer (no-login,
-  QR-tracking view — deferred to a later phase). Full role detail:
-  `docs/SRS.md` § 1.
+- **Users of the intended system:** Customer (priced order-form entry through
+  a private customer-specific link after design agreement); Admin (entry on
+  behalf of customers, commercial records and order coordination); Staff
+  (production work). Detailed Staff permissions follow the agreed module and
+  action model. Customer QR tracking remains deferred and is separate from the
+  agreed form-entry direction.
 
 ## 2. Methodology
 
 ### 2.1 Software Model
 
-The current phase (Phase 1A — Product and Frontend Foundation) follows an
-iterative, evidence-gated approach: draft a decision → record it →
-review it → move to the next dependent decision. Each step only proceeds
-once its dependency is recorded, rather than committing to a full
-up-front plan.
+LLL Print follows an iterative, journey-based development approach. Review
+the business workflow and record its requirements in the SRS. Then design the
+UI/UX, architecture, database and interfaces together in the SDD before
+implementing the affected journey.
 
-For subsequent development, finish one user journey at a time. Before coding
-a journey, settle its fields, rules, screen states and acceptance checks in
-the SRS and its implementation boundaries in the SDD. Review the working
-journey before starting the next one. Do not build every screen independently
-and postpone integration until the end.
+Develop and verify one connected journey at a time rather than treating each
+screen as an independent feature. For each journey:
 
-Frontend and backend development follow the same SRS and SDD. Business rules
-and interface changes are reviewed together before integration.
+1. Confirm the users, inputs, pricing or business rules, statuses, exceptions
+   and expected result.
+2. Define the screen behaviour, data relationships, system boundaries and
+   acceptance checks.
+3. Compare the existing prototype with the reviewed requirements and decide
+   what can be retained, corrected or replaced.
+4. Implement only the approved slice, then verify the complete workflow on
+   its applicable customer, office and production devices.
+
+Frontend and backend work use the same SRS and SDD. A change to an order field
+or business rule must be reviewed across the form, documents, production view,
+API and database before integration. The present activity is document review;
+it does not establish that the revised workflow is implemented.
 
 ### 2.2 Software and Hardware Specification
 
-#### Current platform and frontend
+#### Current development environment and frontend
 
 | Item | Specification |
 |---|---|
-| Operating System | Cross-platform (web-based) |
-| Frontend | React, TypeScript, Vite, React Router, TanStack Query |
+| Development operating system | Windows workspace currently used for the project |
+| Application type | Responsive web application accessed through a supported browser |
+| Existing frontend | React, TypeScript, Vite, React Router, TanStack Query |
+| Frontend status | Synthetic-data prototype; does not yet represent the complete revised workflow |
 
 #### Planned later backend direction
 
@@ -157,114 +221,49 @@ and interface changes are reviewed together before integration.
 | Background jobs | pg-boss |
 | File/object storage | S3-compatible object storage |
 
-These planned components are not yet built and are not authorized for the
-current phase.
+These planned components are not yet built. PostgreSQL supports the planned
+business records; object storage is relevant to mockup attachments. The need
+for background jobs must be justified by a specific approved task such as
+document generation or retryable processing before implementation.
 
 #### Target devices
 
 | Item | Specification |
 |---|---|
-| Target devices | Office desktop, supervisor tablet, factory-floor mobile device |
-| Display | Responsive layout required for all three device contexts |
+| Customer access | Customer mobile phone, tablet or desktop browser for the priced order form |
+| Internal access | Office desktop, supervisor tablet and factory-floor mobile device |
+| Display | Responsive layout appropriate to each user and task |
+| Development hardware minimum | Not yet measured or agreed |
+| Supported browser/device minimum | To be defined and verified before a real-data release |
 
 ## 3. Project Management Plan
 
 ### 3.1 Project Milestone
 
-| Milestone | Result | Status |
-|---|---|---|
-| M1 | Foundation restored | Complete |
-| M2 | Governance baseline | Complete |
-| M3 | Prototype review | Complete |
-| M4 | MVP baseline | Complete |
-| M5 | SRS/SDD baseline completion | In progress |
-| M6 | Phase 1A closure | Pending |
+The milestones below describe the actual project position. An earlier
+synthetic-data frontend prototype exists, but it was built before the current
+order-intake direction was understood clearly. Its existence is not evidence
+that the requirements or design milestones are complete.
 
-- **M2:** Product context was approved on 2026-08-30 and is now in
-  `docs/SRS.md` § 1.
-- **M3:** A review of LLL Print's own clickable prototype was carried out.
-  The planned separate findings file was never written; its results were
-  folded into `docs/SRS.md` section 2, including the mobile-navigation fix.
-- **M4:** v1 scope was approved on 2026-08-30 and is now in
-  `docs/SRS.md` §§ 2–3.
-- **M5:** Scope expanded on 2026-09-08 to complete and review the SRS/SDD
-  development baseline.
+| Milestone | Description | Outcome | Status | Completion date |
+|---|---|---|---|---|
+| M1 — Product planning review | Confirm the real workflow, purpose, scope and unresolved business decisions | Reviewed SPMP | In progress | To be agreed |
+| M2 — Requirements review | Define the customer/Admin form, quotation, invoice, payment, production and shipping behaviour | Approved SRS | Pending | To be agreed |
+| M3 — UI and technical design | Design the screen flows, architecture, database, interfaces and mockup storage from the approved requirements | Approved SDD and linked UI designs | Pending | To be agreed |
+| M4 — Existing prototype assessment | Compare the current frontend with the approved SRS/SDD and identify what can be retained, corrected or replaced | Evidence-based prototype assessment and implementation plan | Pending | To be agreed |
+| M5 — Implementation by journey | Implement approved customer and internal journeys in small connected stages | Working system slices that satisfy their acceptance checks | Pending | To be agreed |
+| M6 — System verification and release preparation | Verify the complete workflow, responsive use, data integrity, access controls and operational readiness | Reviewed release candidate and documented remaining risks | Pending | To be agreed |
 
-#### Next work and completion conditions
+Milestones move forward only when their stated outcome has been reviewed.
+Reaching a later milestone does not erase the need to revisit an earlier one
+when the business workflow changes. No completion dates are assumed.
 
-These are proposed delivery stages, not implementation authorization or
-promised dates. No completion dates have been agreed for the pending stages.
+The current work is M1. After the SPMP is reviewed, the next work is M2: align
+the SRS with the agreed single-entry workflow. Database tables, API contracts
+and screen layouts belong to M3 after their requirements are clear.
 
-| Stage | Work | Completion condition | Target date |
-|---|---|---|---|
-| Planning — current | Explain the product journey; settle the first slice's rules; document code boundaries and real-data security targets | The journey is understood, its open business decisions are answered, and requirements link to design and acceptance checks | To be agreed |
-| Frontend foundation — later | Review existing local scaffold, define feature folders and mock-data behaviour, define the first frontend task | Routing and shared layout work; mock/API boundary is clear; relevant tests and build pass | To be agreed |
-| First complete frontend journey — later | Customer selection → quotation → accepted quotation → job | Correct totals and quantities, rejected invalid transitions, recoverable failures, and usable desktop/tablet/mobile flow | To be agreed |
-| Remaining frontend workflows — later | Job progress and history, billing/payments, then inventory/BOM/manual ledger | Each module passes its SRS acceptance checks before the next is treated as complete | To be agreed |
-| Backend and integration — later | Implement backend modules from agreed API contracts; implement identity, persistence and server rules by journey | Frontend and backend pass contract, permission, transaction and end-to-end checks | To be agreed |
-| Real-data readiness — later | Verify security targets, operational recovery and release configuration | Agreed security checks pass and a backup restore is demonstrated; unresolved release blockers are closed | To be agreed |
-
-#### Batched development task plan
-
-All tasks below are future work. The current planning batch documents the
-journeys, design and checks together; coding starts only when the relevant
-decisions are settled and implementation is requested. Task IDs are local
-planning references, not created issues or completion claims.
-
-| Task | Deliverable | Depends on | Completion evidence |
-|---|---|---|---|
-| T1 — Planning decisions | D1–D5 accepted and incorporated on 2026-09-09; business contracts and data constraints documented | Complete for this planning batch; overall documents remain Draft | Accepted rules, transition tables, contract fields and AT checks agree |
-| T2 — Frontend preparation | Review existing scaffold and agree allowed feature files, synthetic fixtures and interfaces | T1 decisions needed for first journey; user implementation request | Reproducible setup, reviewed scope, foundation checks and build pass |
-| T3 — Quotation and customer flow | Frontend: customer picker, quotation form/detail, totals and recoverable save states | T2; approved validation and contact contract | AT-01, applicable AT-06/AT-07 |
-| T4 — Conversion and production | Frontend: revision/conversion, job board/detail and history | T3; D1/D2 and their contracts | AT-02/AT-03, applicable AT-06/AT-07 |
-| T5 — Billing | Frontend: early invoice issue, deposits/later receipts, replacement review, manual refunds, cancellation settlement and history | T4; exact billing contract under SRS FR-7/FR-8 and SDD §5 | AT-04 plus correction/refund/settlement cases, applicable AT-06/AT-07; backend must verify AT-08 and transaction races |
-| T6 — Inventory support | Frontend: contacts management, items, BOM and manual ledger | T2; D4 and related contracts | AT-05, applicable AT-06/AT-07 |
-| T7 — Secure backend by journey | Identity/ownership first, then matching module APIs, constraints and transactions | Agreed contracts, D5/security design and explicit backend scope | Contract tests plus permission, transaction and concurrency checks; relevant AT-01–AT-08 |
-| T8 — Integration and release review | Connect one frontend journey at a time, retire its mocks from connected mode, verify end-to-end and recovery | Corresponding frontend/backend tasks | Relevant AT checks against API; full AT-08 and release blockers closed before real-data use |
-
-#### Ready-to-assign task briefs
-
-These task briefs define implementation scope and completion criteria.
-Inspect the existing working tree and preserve unrelated local changes.
-Select the applicable brief, include the named SRS/SDD sections, and require a
-reviewable diff and actual verification results before accepting completion.
-
-| Brief | Allowed implementation scope when assigned | Required result and checks |
-|---|---|---|
-| Frontend — foundation (T2) | `src/app`, shared layout/navigation and synthetic data-adapter wiring; inspect existing scaffold before changing it | Five agreed destinations, demo reset notice, one adapter boundary; synthetic data only; no backend calls; navigation tests and build pass |
-| Frontend — quotation slice (T3) | Contacts selector and `src/features/quotations`, pure calculation module, adapter fixtures and related tests | SRS FR-1/FR-4, SDD Contact/Quotation DTOs and AT-01/06/07. Incomplete draft survives failed save; decimal examples pass; no feature business logic added to App/PrototypeApp |
-| Frontend — job slice (T4) | Quotation revision/conversion and `src/features/jobs` | FR-2/FR-3/FR-6 transition table; repeat conversion/stale version rejected; snapshots and mobile views verified with AT-02/03/06 |
-| Frontend — billing slice (T5) | `src/features/billing`, mock Billing API and related tests | Full SDD billing contract, FR-7/FR-8, AT-04/04a/04b; distinguish actual receipts/refunds from promises; retain invoice history and prevent duplicate mock effects |
-| Frontend — inventory slice (T6) | Contact management, `src/features/inventory` and adapters/tests | FR-9, Item/BOM/Movement DTOs; signed previews, immutable reversals, no automatic stock deduction; AT-05/06/07 |
-| Backend — backend prerequisite (T7a) | Design/review login, session, membership and grants first; implementation only after that scope is assigned | Company-bound identity, explicit permissions, session revocation and negative access tests. Never deploy an unauthenticated business API as a placeholder |
-| Backend — module slice (T7b) | One assigned module with controller, service/domain, persistence and tests in the later backend directory | Implement exact SDD contract and constraints, ownership checks, atomic history and idempotency; compare against frontend fixtures and relevant AT cases. Do not change frontend contract silently |
-
-For each implementation task: state the task ID, allowed files, contract version
-(2026-09-09), relevant FR/AT IDs and excluded work. Stop only the dependent
-change if a contract conflict is discovered; report it rather than guessing.
-Dependency changes, authentication, migrations and deployment require their
-own implementation scope; they are not implied by a frontend task.
-
-The next development step is frontend preparation (T2). Full backend readiness
-still requires T7a and operational
-security/recovery decisions. Do not call all production planning complete from
-the business-contract baseline alone.
-
-T3–T7 are divided into small reviewed changes against the same requirements
-and contract baseline. T6 can
-follow a different order after its dependencies are met. Backend work need
-not wait for every frontend screen once the first contract is agreed.
-
-The current planning batch is complete when the worked example, exception
-recommendations, screen states, code boundaries and acceptance mapping are
-consistent across the three documents. D1–D5 are now accepted. This is distinct
-from completion of production design or permission to start coding.
-
-Phase 1A explicitly excludes: production backend APIs/services,
-databases/migrations/production data, production authentication,
-infrastructure/deployment operations, real file storage, messaging/
-payment/OCR/AI/accounting integrations, and any tax/accounting/PDPA/SST/
-MyInvois/security/accessibility compliance claim. The current phase includes
-completing and reviewing the SRS/SDD development baseline, but does not
-authorize backend, database, infrastructure, authentication, dependency, or
-deployment work (see `docs/SRS.md`, `docs/SDD.md`).
+Implementation task briefs will be prepared later from the approved SRS and
+SDD. Older task labels and prototype sequencing are historical context, not
+the current plan. Inventory, BOM and Stock Ledger remain deferred. Backend,
+database, authentication, file-storage and deployment implementation require
+their own assigned work after the relevant design milestone is approved.
