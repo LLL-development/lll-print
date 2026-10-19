@@ -42,3 +42,6 @@ firebase-adminsdk*.json
 *.njsproj
 *.sln
 *.sw?
+
+# Scratch folder for working files. Never committed - it holds personal documents.
+.codex-temp/
