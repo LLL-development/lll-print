@@ -1,0 +1,10 @@
+# Copy this file to application-local.properties and fill in the real value.
+# That file is ignored by git and must never be committed (SEC-4).
+#
+#   cp application-local.properties.example application-local.properties
+#
+# The password is the one for the lll_print database user, not for root.
+# On a development machine it is written down outside this repository, with
+# the rest of the database setup.
+
+spring.datasource.password=replace-with-the-lll_print-user-password
