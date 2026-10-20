@@ -13,6 +13,12 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
+    # The screens live in web/. The server in server/ is built separately and is
+    # not published to Cloudflare Pages.
+    defaults:
+      run:
+        working-directory: web
+
     steps:
       - uses: actions/checkout@v4
 
@@ -20,6 +26,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: web/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -32,4 +39,6 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=lll-print
+          # This path is read from the repository root, not from web/, because
+          # the action does not use the working-directory above.
+          command: pages deploy web/dist --project-name=lll-print

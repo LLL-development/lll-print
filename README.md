@@ -27,7 +27,12 @@ login, database, or external integration.
 
 ## Local development
 
+The screens live in `web/` and the server in `server/`. Every command below is
+run from `web/`.
+
 ```powershell
+cd web
+
 # Install the locked project dependencies
 npm ci
 
