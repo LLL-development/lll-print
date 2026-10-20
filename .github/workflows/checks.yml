@@ -1,0 +1,153 @@
+name: Checks
+
+# Runs on every pull request, so nothing broken can be merged. The deploy
+# workflow is separate and only runs after something reaches main.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  screens:
+    name: Screens
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  server:
+    name: Server
+    runs-on: ubuntu-latest
+
+    # A real database, so this job also proves the migrations rebuild the
+    # structure from nothing on every pull request.
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-only
+          MYSQL_DATABASE: lll_print
+          MYSQL_USER: lll_print
+          MYSQL_PASSWORD: ci-password-only
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u root -pci-root-only"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+
+    defaults:
+      run:
+        working-directory: server
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Build and test
+        run: ./mvnw -B --no-transfer-progress verify
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/lll_print?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=Asia/Kuala_Lumpur
+          SPRING_DATASOURCE_USERNAME: lll_print
+          SPRING_DATASOURCE_PASSWORD: ci-password-only
+
+  hygiene:
+    name: Hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Nothing private in the changed files
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -uo pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            git fetch --no-tags origin "$BASE_REF"
+            BASE="$(git merge-base "origin/$BASE_REF" HEAD)"
+          else
+            BASE="$(git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD)"
+          fi
+
+          status=0
+
+          # Files that must never be committed at all.
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            case "$f" in
+              *.orig|*.rej)
+                echo "::error file=$f::a merge leftover was committed"
+                status=1 ;;
+              .env|.env.local|.env.*.local|*/.env|*/.env.local)
+                echo "::error file=$f::an environment file was committed"
+                status=1 ;;
+              *application-local.properties)
+                echo "::error file=$f::the local database password file was committed"
+                status=1 ;;
+              .codex-temp/*)
+                echo "::error file=$f::the scratch folder holds personal documents and this repository is public"
+                status=1 ;;
+              *.pem|*.key|*.p12|*.pfx)
+                echo "::error file=$f::a private key was committed"
+                status=1 ;;
+            esac
+          done < <(git diff --name-only --diff-filter=ACMR "$BASE"...HEAD)
+
+          # Secrets pasted into otherwise innocent files.
+          if git diff --diff-filter=ACMR "$BASE"...HEAD -- . ':!package-lock.json' ':!**/package-lock.json' ':!**/*.example' \
+             | grep -nE '^\+.*(spring\.datasource\.password[[:space:]]*=[[:space:]]*\S|BEGIN [A-Z ]*PRIVATE KEY|CLOUDFLARE_API_TOKEN[[:space:]]*[:=][[:space:]]*[A-Za-z0-9_-]{20,})'; then
+            echo "::error::a password or key appears in the diff"
+            status=1
+          fi
+
+          # A dollar sign in the three documents means a currency mistake.
+          # Money is always RM here, never a dollar sign.
+          while IFS= read -r f; do
+            case "$f" in
+              docs/*.md)
+                if grep -n '\$' "$f" 2>/dev/null; then
+                  echo "::error file=$f::a dollar sign appears - money is written as RM"
+                  status=1
+                fi ;;
+            esac
+          done < <(git diff --name-only --diff-filter=ACMR "$BASE"...HEAD)
+
+          exit $status
