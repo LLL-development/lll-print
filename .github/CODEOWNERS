@@ -1,0 +1,29 @@
+# Who gets asked to review what.
+#
+# GitHub requests a review from the owner automatically when a pull request
+# touches one of these paths. It is also a plain list of which parts of this
+# repository are the sensitive ones.
+#
+# Philip is not listed yet. Add @PhilipLX3 beside the paths below if the team
+# wants a second pair of eyes on the money, the permissions or the database.
+
+*                                   @muflih04
+
+# The requirements. Changing these changes what the system is supposed to do.
+/docs/                              @muflih04
+
+# The database structure. A migration cannot be taken back once it has run
+# somewhere real.
+/server/src/main/resources/db/      @muflih04
+
+# How the server is configured, including where secrets are read from.
+/server/src/main/resources/application.properties   @muflih04
+/server/pom.xml                                     @muflih04
+
+# What runs automatically, and what is allowed to be committed.
+/.github/                           @muflih04
+/.gitignore                         @muflih04
+
+# Dependencies.
+/web/package.json                   @muflih04
+/web/package-lock.json              @muflih04
