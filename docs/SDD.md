@@ -32,7 +32,7 @@ Section by section:
 | 1. What this document is for | **Redone.** Corrected to say there are two programs and that the server does not exist yet |
 | 2. What the system is made of | **Redone** against SPMP § 2.2: the server, its three layers, what is enforced where, and the two folders the code sits in |
 | 3. Module / component breakdown | **Redone.** The five modules, which requirement each covers, and what each delivers. It named a third database and a seventh module; both are gone, along with the customer's own order form |
-| 4. Data design | **Redone.** Twenty-five MySQL tables with an ERD, the three levels as three tables, one job record, and the two lists of what MySQL enforces and what the server enforces |
+| 4. Data design | **Redone.** Twenty-six MySQL tables with an ERD, the three levels as three tables, one job record, and the two lists of what MySQL enforces and what the server enforces |
 | 5. Who may read and write each record | **Redone.** What the server enforces, read from the signed-in account on every request. One job record, the quotation freeze with its five writable columns, the eleven grants each backed by a rule, and **all eleven security targets cited, SEC-9a included** |
 | 6. The screens and the REST API | **Redone.** The five destinations, what every screen must do, the responsive and keyboard checks, how the screens talk to the server, the two rules that stop a double write and a lost edit, every address module by module, the three things that have states, how the money is worked out with the real order's own figures, nineteen checks, and its open points |
 | 7. Non-functional design notes | **Redone.** The devices and the connection, money and language and time, keeping it maintainable, and one pointer to section 5. Its own security mapping is gone: it stopped at seven targets where there are eleven, and matched several of them to the wrong rule |
@@ -41,7 +41,7 @@ Section by section:
 
 **What survives, because it is business rule rather than architecture:** the
 three levels of an order, three separate stores for quotation, job and invoice,
-the typed price per piece, the typed order charge, a material carrying its weight
+the base price per piece, the typed order charge, a material carrying its weight
 in its name, and numbers that count up. Those decisions stand; only their
 mechanism changes.
 
@@ -483,11 +483,11 @@ These hold for every table below without being repeated.
 
 ### The tables
 
-Twenty-five.
+Twenty-six.
 
 | Group | Tables |
 |---|---|
-| The shop and its people | `shop`, `staff_account`, `staff_grant` |
+| The shop and its people | `shop`, `staff_account`, `staff_grant`, `staff_session` |
 | What the shop sells | `catalogue_option`, `customer_price`, `production_step` |
 | Customers | `contact` |
 | The order and its quotation | `quotation`, `quotation_specification`, `quotation_garment_group`, `quotation_size`, `quotation_charge` |
@@ -501,6 +501,7 @@ erDiagram
     SHOP ||--o{ CATALOGUE_OPTION : "offers"
     SHOP ||--o{ STAFF_ACCOUNT : "employs"
     STAFF_ACCOUNT ||--o{ STAFF_GRANT : "is granted"
+    STAFF_ACCOUNT ||--o{ STAFF_SESSION : "is signed in on"
     CONTACT ||--o{ CUSTOMER_PRICE : "has own price for"
     CATALOGUE_OPTION ||--o{ CUSTOMER_PRICE : "priced by"
 
@@ -574,6 +575,19 @@ Four things about these two tables matter more than their columns.
 **The password is stored hashed and is never readable** (SEC-6). Nothing in the
 system, and no endpoint, returns it.
 
+**`staff_session`** — one row per session that is currently signed in.
+`staff_account_id`, a hash of the token, when it was issued, when it runs out,
+and when it was signed out.
+
+**Signing out has to end access, and a token on its own cannot do that** (SEC-6).
+A token that is only signed and checked keeps working until it runs out, whatever
+happens afterwards. The row is what makes signing out real: it is marked as ended,
+and the server reads it on every request, which is the same read the grants
+already need (D-AF). The same row is what makes a session run out.
+
+**The token itself is never stored**, only a hash of it, so a copy of the database
+hands over no working session (SEC-4).
+
 ### What the shop sells
 
 **`catalogue_option`** — one row per option (FR-12.1, FR-12.2).
@@ -597,8 +611,16 @@ actually stocks, and no rule is needed to say which weights go with which cloth.
 **The pair is unique**, so the database itself makes two prices for the same
 customer and option impossible. Used instead of the standard price by FR-1.5.
 
-There is **no** customer price for the price per piece, and no standard one
-either. That figure is typed on each order and nothing keeps it (FR-1.4a, D-T).
+**The cloth carries the base price per piece** (FR-1.4a). 150gsm at RM 11.00
+and 170gsm at RM 13.00 are two options in the `material` list, and the plainest
+garment - roundneck, short sleeve - costs what the cloth costs. A neck or a
+sleeve that differs from plain is an option adding its own amount on top, so
+roundneck and short sleeve are options priced at RM 0.00 and are still shown at
+RM 0.00 (FR-1.9).
+
+Because the cloth is an option like any other, **a customer price may be set
+against it** and FR-1.5's three steps resolve it exactly as they resolve any
+other option. Nothing holds a base price that belongs to no cloth.
 
 **`production_step`** — the shop's own steps: `printing_method`, `position`,
 `label` (FR-3.7). Sublimation and embroidery do not share a step list, and the
@@ -633,7 +655,7 @@ form's save and the quotation's save are the same write.
 | `contact_id`, and the customer details copied | The key and the copy |
 | The shop details copied | FR-13.4 |
 | `date_wanted`, `valid_until` | Calendar dates (FR-1.2, FR-2.3) |
-| `price_per_piece_sen` | Typed by Admin. No standard, no customer price, never filled in by the system (FR-1.4a) |
+| `price_per_piece_sen` | The base price per piece, copied from the cloth option as it was shown, or a one-off price Admin typed over it (FR-1.4a, FR-1.5). Stored as a copy so the document can be reproduced exactly |
 | `source_note` | Where the order came from. Optional, and nothing is refused because it is empty (FR-4) |
 | `fulfilment_method` | `delivery` or `collection`. For delivery, the recipient's name, phone, address, postcode and state and the `shipping_charge_sen` Admin set; for collection, the pickup location copied from the shop, which Admin may change for one order (FR-6.6, FR-6.7) |
 | `item_subtotal_sen`, `shipping_charge_sen`, `grand_total_sen` | Worked out from the lines, and stored so a document can be reproduced exactly. The server works them out again on every read and every write (SEC-7) |
@@ -1030,6 +1052,7 @@ types every order in this version, so "Admin" is also who types one.
 |---|---|---|---|---|
 | `shop` | Any signed-in account of that shop | Nobody — created once at setup | Admin (FR-13.2) | Nobody |
 | `staff_account`, `staff_grant` | Admin, and an account may read **its own** | Admin (FR-10.1) | Admin only, never the account itself (FR-10.5) | Nobody — switched off with `active` |
+| `staff_session` | Nobody. The server reads it to decide who is asking | Signing in | Signing out, which marks it ended (SEC-6) | Nobody |
 | `catalogue_option` | Any signed-in account of that shop | Admin, or `maintain the catalogue` (FR-12.9) | Same | Refused where any record points at it. Stopping it being offered is a flag (FR-12.5) |
 | `customer_price` | Admin | Admin | Admin | Admin |
 | `production_step` | Any signed-in account of that shop | Admin, or `maintain the catalogue` | Same (FR-3.7) | Same |
@@ -1483,10 +1506,10 @@ Module 1, and the four showings in SPMP section 3.1 are built across these.
 | `POST /quotations/{id}/convert` | Makes the job and the invoice together, once. Takes the deposit, from RM 0.00 up to the total (FR-2.8, FR-2.10) | **Admin only** |
 | `GET /quotations/{id}/history` | Everything that happened to it (FR-5) | Admin, or a granted read |
 
-`POST /quotations` and `PUT` never accept a total. Admin types the price per
-piece — there is no standard price and the system never fills one in (FR-1.4a) —
-and the server works every total out from the options, the sizes and the typed
-charges (SEC-7).
+`POST /quotations` and `PUT` never accept a total. The base price per piece
+comes from the cloth chosen, or from a one-off price Admin typed over it
+(FR-1.4a, FR-1.5), and the server works every total out from the options, the
+sizes and the typed charges (SEC-7).
 
 `convert` is the one transaction set out in section 4. Pressing it twice makes
 one job, because `job.quotation_id` is unique and MySQL refuses the second

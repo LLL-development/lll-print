@@ -114,9 +114,9 @@ because no picture is attached.
 | Garment group | One garment on an order, with its own options and its own row of sizes and quantities |
 | Option | One choice that can be made on an order, such as a neck, a sleeve or a size. Options come from the catalogue, are shown as buttons, and each carries its own price |
 | Option catalogue | The list of options the shop offers, and what each one costs as standard. Admin maintains it |
-| Price per piece | The price of the garment itself, before any option. Admin types it for each order. Nothing keeps a standard one and the system never fills it in |
+| Base price per piece | The price of the plainest garment - roundneck, short sleeve - in the cloth chosen. It comes from the cloth's own option in the catalogue, which the shop sets. A different neck or sleeve adds its own amount on top |
 | Order charge | A charge on the whole order, such as artwork setup. Admin types its name and its amount for that order. It is not in the catalogue and is never negative |
-| Standard price | The price of an **option** when nothing more specific applies. There is no standard price per piece |
+| Standard price | The price of an **option** when nothing more specific applies, including the cloth that carries the base price per piece |
 | Customer-specific price | A price Admin has set for one customer against an option, used instead of that option's standard price for that customer |
 | One-off order price | A price Admin types over an option's resolved price, for one order only |
 | Mockup | The picture of the agreed design, attached to the order. Optional, and it may be attached at any time |
@@ -145,7 +145,7 @@ sent one WhatsApp message asking for scouting camp shirts.
 | 3 | Admin sets the order's specifications — EYELAT 170gsm as the material | The specifications apply to every garment on the order |
 | 4 | Admin adds five garment groups, choosing the neck and sleeve for each from the option buttons | Five garment groups. Each button shows the price it carries |
 | 5 | Admin types the sizes and quantities under each garment group | Twenty size entries, 55 helai in total |
-| 6 | Admin types the price per piece — RM 28.00 — and the system works the rest out as it goes | A running total. The price per piece shows as its own line, 55 helai at RM 28.00 for RM 1,540.00, and then every priced option with its own arithmetic. The total is RM 1,734.00 |
+| 6 | The cloth already carries its price — RM 28.00 for EYELAT 170gsm — and the system works the rest out as it goes | A running total. The cloth shows as its own line, 55 helai at RM 28.00 for RM 1,540.00, and then every priced option with its own arithmetic. The total is RM 1,734.00 |
 | 7 | Admin makes the quotation and sends the customer its link | One saved quotation with a validity date. The customer opens the link and reads it without logging in |
 | 8 | The customer agrees. Admin records that they agreed, and when | The quotation is marked agreed, with the date |
 | 9 | Admin presses one action | A job and an invoice for RM 1,734.00, both created together from the same order. Nothing is typed again |
@@ -184,9 +184,9 @@ modules in SPMP section 3.1. They match the scope in SPMP section 1.5.1.
    materials, the printing methods, the print locations, and names and numbers.
    Admin decides which are available and what each is worth, and an option may
    be worth nothing or worth less than nothing. No choice on the order form can
-   be made unless it is in the catalogue first. The two figures that are typed
-   instead of chosen are the price per piece and an order charge such as artwork
-   setup. See FR-12, FR-1.4a and FR-1.6a.
+   be made unless it is in the catalogue first. The cloth carries the base price
+   per piece (FR-1.4a). The one figure typed instead of chosen is an order charge
+   such as artwork setup. See FR-12, FR-1.4a and FR-1.6a.
 2. **One order form, typed by Admin** — after the design has been agreed outside
    the system. The customer does not fill it in and does not log in.
 3. **The order in three levels** — one set of specifications for the whole order,
@@ -199,9 +199,9 @@ modules in SPMP section 3.1. They match the scope in SPMP section 1.5.1.
    Admin reviews and may change before it is applied. See FR-1.14.
 5. **The mockup attached to the order** — one picture of the agreed design. It
    may be attached at any time and nothing waits for it.
-6. **The price worked out and shown** — the price per piece Admin typed, and
-   every option that affects the price, each shown with its own arithmetic, with
-   a running total building as Admin types.
+6. **The price worked out and shown** — the base price per piece the cloth
+   carries, and every option that affects the price, each shown with its own
+   arithmetic, with a running total building as Admin types.
 7. **A quotation with a validity date** — the saved record of the order and its
    price, with the date after which those prices are no longer offered.
 8. **A quotation document with a private link** — Admin sends the link to the
@@ -399,21 +399,25 @@ on screen, is covered in section 5.
   read — for example `readymade`. A note on a size is free text too, and is for
   identifying one piece, such as a person's name or number.
 
-  This clause governs those six choices. It does not govern the price per piece,
-  which is typed (FR-1.4a), nor an order charge, which is typed (FR-1.6a).
-- FR-1.4a Every order shall carry a **price per piece**, which Admin types. It
-  is the price of the garment itself, before any option is added. On the real
-  order it is RM 28.00, and 55 helai at RM 28.00 is RM 1,540.00 of the
-  RM 1,734.00 total.
-  - It shall be typed for each order. The system shall **not** keep a standard
-    price per piece anywhere, shall not keep one for each customer, and shall
-    never fill the figure in by itself.
-  - It shall be zero or above. It shall be required before a quotation can be
+  This clause governs those six choices. The cloth is one of them, and it
+  carries the base price per piece (FR-1.4a). It does not govern an order charge,
+  which is typed (FR-1.6a).
+- FR-1.4a Every order shall carry a **base price per piece**: the price of the
+  plainest garment — roundneck, short sleeve — in the cloth chosen. It comes
+  from the cloth's own option in the catalogue (FR-12), which the shop sets
+  itself — for example 150gsm at RM 11.00 and 170gsm at RM 13.00. On the real
+  order the cloth is EYELAT 170gsm at RM 28.00, and 55 helai at RM 28.00 is
+  RM 1,540.00 of the RM 1,734.00 total.
+  - A neck or a sleeve that differs from the plain garment shall add its own
+    amount on top — Polo adds RM 4.00, Long sleeve adds RM 3.00. Roundneck and
+    short sleeve are therefore options priced at RM 0.00, and shall still be
+    shown at RM 0.00 under FR-1.9.
+  - The system shall **never invent the figure.** It is the price of the cloth
+    chosen, or a one-off price Admin has typed over it for this order under
+    FR-1.5.
+  - It shall be zero or above. A cloth shall be chosen before a quotation can be
     made (FR-1.11).
   - It shall never fall automatically because more was ordered (FR-1.9).
-  - It is not an option and is not in the catalogue, so the three steps in
-    FR-1.5 do not apply to it. There is nothing for them to resolve: the typed
-    figure is the only figure.
 - FR-1.5 The system shall work out the price of **an option** in this order:
   1. a one-off price Admin has typed for this order,
   2. a price set for this customer,
@@ -423,8 +427,8 @@ on screen, is covered in section 5.
   what is being charged without opening anything. Admin may type a one-off price
   over it at any point before the quotation is made.
 
-  This applies to options only. The order's price per piece is typed under
-  FR-1.4a and is not resolved from anything.
+  The cloth is an option like any other, so these three steps resolve the base
+  price per piece as well (FR-1.4a).
 - FR-1.6 Each option shall be charged either **for every piece** or **once for
   the whole order**, as the catalogue says for that option. A per-piece option
   shall be multiplied by the number of pieces it applies to.
@@ -446,9 +450,9 @@ on screen, is covered in section 5.
     kind of thing across orders.
 - FR-1.7 The system shall show the price building as Admin types, and shall show
   every line that affects it with its own arithmetic — what it is, how many it
-  applies to, the price each, and the result. This covers the price per piece as
-  its own line — `55 helai x RM 28.00 = RM 1,540.00` — and then every option. A
-  total with no workings shown is not acceptable.
+  applies to, the price each, and the result. This covers the cloth as its own
+  line — `EYELAT 170gsm, 55 helai x RM 28.00 = RM 1,540.00` — and then every
+  other option. A total with no workings shown is not acceptable.
 - FR-1.8 All money shall be held in whole sen. RM 1,734.00 is held as 173400.
   Where working out a line produces a fraction of a sen, it shall be rounded to
   the nearest sen, with a half rounded up, at that line. Lines shall then be
@@ -463,8 +467,9 @@ on screen, is covered in section 5.
   Its total shall be clearly marked as not yet final.
 - FR-1.11 The system shall not allow a quotation to be made from an order unless
   it has a customer, a job title, a date the customer wants it by, complete order
-  specifications, a typed price per piece (FR-1.4a), and at least one garment
-  group holding at least one size with a quantity above zero. A mockup shall
+  specifications including the cloth that carries the base price per piece
+  (FR-1.4a), and at least one garment group holding at least one size with a
+  quantity above zero. A mockup shall
   never be required.
 - FR-1.12 Admin shall be able to attach one picture of the agreed design to the
   order.
@@ -519,7 +524,7 @@ on screen, is covered in section 5.
 
 - FR-2.2 Making a quotation from an order shall save the customer, the job
   title, the order specifications, every garment group with its options and
-  notes, every size and quantity, the typed price per piece, the price resolved
+  notes, every size and quantity, the base price per piece, the price resolved
   for each option, every typed order charge, and the totals — exactly as they
   were shown when it was made.
   Changing the option catalogue, a standard price or a customer price afterwards
@@ -955,8 +960,9 @@ a requirement on the server and not on the screens. See SEC-1 and SEC-3.
 
 No **choice** on the order form can be made unless it is in the catalogue first,
 so the catalogue is built before the form and is the first thing module 1
-delivers. Two figures are typed rather than chosen and are not in the catalogue:
-the order's price per piece (FR-1.4a) and an order charge (FR-1.6a).
+delivers. One figure is typed rather than chosen and is not in the catalogue: an
+order charge (FR-1.6a). The base price per piece is not typed, because it comes
+from the cloth (FR-1.4a).
 
 - FR-12.1 Admin shall maintain the list of options the shop offers. There shall
   be a separate list for each kind of option: **neck**, **sleeve**, **size**,
@@ -1068,9 +1074,10 @@ the order's price per piece (FR-1.4a) and an order charge (FR-1.6a).
 - Neck, sleeve, size, material, printing method and print location are buttons
   drawn from the catalogue. Nothing can be typed into them, and no value outside
   the catalogue is accepted. Each button shows the price it applies.
-- The order's price per piece is typed for that order. No standard price per
-  piece is kept anywhere, none is kept per customer, and the system never fills
-  the figure in by itself. A quotation cannot be made until it is typed.
+- The base price per piece is the price of the plainest garment - roundneck,
+  short sleeve - in the cloth chosen, and it comes from the catalogue. A neck or
+  a sleeve that differs from plain adds its own amount on top. A quotation cannot
+  be made until a cloth has been chosen.
 - A charge on the whole order, such as artwork setup at RM 50.00 once, is typed
   on the order by name and amount. It is not in the catalogue and typing one
   changes nothing for any other order. **A typed charge is never negative** — a
@@ -1078,12 +1085,13 @@ the order's price per piece (FR-1.4a) and an order charge (FR-1.6a).
   onto the order, because that would be the discount FR-1.9 forbids.
 - The price shown on an **option** is the one-off price if Admin typed one, then
   the customer's own price if there is one, then the standard price. Those three
-  steps apply to options and not to the price per piece. There is no discount
-  field and no tax field. An option worth less shows a price below zero; an
+  steps apply to every option, the cloth included. There is no discount field
+  and no tax field. An option worth less shows a price below zero; an
   option that is free shows RM 0.00 rather than being hidden.
 - Every line is shown with its own arithmetic — what it is, how many it applies
-  to, the price each, and the result. The price per piece is one such line,
-  `55 helai x RM 28.00 = RM 1,540.00`, and the options follow it. Shipping adds
+  to, the price each, and the result. The cloth is one such line,
+  `EYELAT 170gsm, 55 helai x RM 28.00 = RM 1,540.00`, and the other options
+  follow it. Shipping adds
   the charge Admin set; self-collection adds none and uses the shop's own
   address, which Admin or a granted Staff account may change for one exceptional
   order.
